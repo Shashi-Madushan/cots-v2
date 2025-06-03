@@ -103,8 +103,10 @@ class PDFGeneratorWorker(QThread):
                     self.single_pdf_complete.emit(False, f"Failed to generate payslip for {emp_name}")
                     continue
                 
-                # Generate PDF
-                pdf_path = self.generate_pdf_file(payslip_content, emp_name)
+                # Generate PDF using the common generator function
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
+                pdf_path = generate_pdf(payslip_content, emp_name, self.output_directory, 
+                                      timestamp, self.page_settings)
                 if pdf_path:
                     success_count += 1
                     self.single_pdf_complete.emit(True, f"Generated PDF for {emp_name} at {pdf_path}")
@@ -122,54 +124,6 @@ class PDFGeneratorWorker(QThread):
             self.progress_updated.emit(progress)
         
         self.process_finished.emit(success_count, error_count)
-
-    def generate_pdf_file(self, content, employee_name):
-        """Generate a PDF from payslip content with customizable page settings"""
-        try:
-            # Clean the employee name for use in filename
-            safe_name = ''.join(c for c in employee_name if c.isalnum() or c in (' ', '-', '_')).strip()
-            safe_name = safe_name.replace(' ', '_')
-            
-            # Create filename with timestamp for uniqueness
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
-            filename = f"Payslip_{safe_name}_{timestamp}.pdf"
-            pdf_path = os.path.join(self.output_directory, filename)
-            
-            # Create a printer set to PDF output
-            printer = QPrinter()
-            printer.setOutputFormat(QPrinter.PdfFormat)
-            printer.setOutputFileName(pdf_path)
-
-            # Apply page settings
-            if self.page_settings["custom_size"]:
-                custom_size = self.page_settings["custom_size"]
-                printer.setPaperSize(custom_size, QPrinter.Millimeter)
-            else:
-                printer.setPaperSize(self.page_settings["paper_size"])
-            
-            margins = self.page_settings["margins"]
-            printer.setPageMargins(
-                margins["left"], margins["top"], margins["right"], margins["bottom"], QPrinter.Millimeter
-            )
-
-            # Create a text document with the content
-            doc = QTextDocument()
-            font = QFont("Courier New", 10)  # Use monospaced font
-            doc.setDefaultFont(font)
-            doc.setPlainText(content)
-
-            # Adjust document layout to respect margins
-            doc.setPageSize(printer.paperRect(QPrinter.Millimeter).size())  # Set page size
-            doc.setDocumentMargin(max(margins.values()))  # Use the largest margin as document margin
-
-            # Generate the PDF
-            doc.print_(printer)
-            
-            return pdf_path
-            
-        except Exception as e:
-            logger.error(f"PDF generation error for {employee_name}: {str(e)}")
-            return None
 
     def cancel(self):
         """Cancel the PDF generation process"""
@@ -307,50 +261,21 @@ class PayslipPDFGenerator:
             # Ensure output directory exists
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
-                
-            # Clean the employee name for use in filename
-            safe_name = ''.join(c for c in employee_name if c.isalnum() or c in (' ', '-', '_')).strip()
-            safe_name = safe_name.replace(' ', '_')
             
-            # Create filename with timestamp for uniqueness
+            # Use timestamp for filename
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"Payslip_{safe_name}_{timestamp}.pdf"
-            pdf_path = os.path.join(output_dir, filename)
             
-            # Create a printer with B4 paper size
-            printer = QPrinter()
-            printer.setOutputFormat(QPrinter.PdfFormat)
-            printer.setOutputFileName(pdf_path)
-
-            # Apply page settings
-            if self.page_settings["custom_size"]:
-                custom_size = self.page_settings["custom_size"]
-                printer.setPaperSize(custom_size, QPrinter.Millimeter)
+            # Generate PDF using the common generator function
+            pdf_path = generate_pdf(payslip_content, employee_name, output_dir, 
+                                  timestamp, self.page_settings)
+            
+            if pdf_path:
+                # Update the output directory for status message
+                self.output_directory = output_dir
+                logger.info(f"PDF saved to: {pdf_path}")
+                return True
             else:
-                printer.setPaperSize(self.page_settings["paper_size"])
-            
-            margins = self.page_settings["margins"]
-            printer.setPageMargins(
-                margins["left"], margins["top"], margins["right"], margins["bottom"], QPrinter.Millimeter
-            )
-            
-            # Create a text document with the content
-            doc = QTextDocument()
-            font = QFont("Courier New", 10)  # Use monospaced font
-            doc.setDefaultFont(font)
-            doc.setPlainText(payslip_content)
-            
-            # Apply padding (if needed, adjust content layout)
-            doc.setDocumentMargin(self.page_settings["padding"])
-            
-            # Generate the PDF directly
-            doc.print_(printer)
-            
-            # Update the output directory for status message
-            self.output_directory = output_dir
-            
-            logger.info(f"PDF saved to: {pdf_path}")
-            return True
+                return False
             
         except Exception as e:
             logger.error(f"Error in PDF generation: {str(e)}")
@@ -596,3 +521,64 @@ class PayslipPrintManager:
     def output_directory(self):
         """Get the output directory from PDF generator"""
         return self.pdf_generator.output_directory
+
+
+# Common PDF generation function used by both single and bulk operations
+def generate_pdf(content, employee_name, output_directory, timestamp, page_settings):
+    """
+    Generate a PDF from payslip content with customizable page settings
+    
+    Args:
+        content: Payslip content to include in PDF
+        employee_name: Name of employee for filename generation
+        output_directory: Directory to save the PDF
+        timestamp: Timestamp to include in filename
+        page_settings: Dictionary containing paper size, margins, and padding settings
+    
+    Returns:
+        Path to generated PDF or None if generation failed
+    """
+    try:
+        # Clean the employee name for use in filename
+        safe_name = ''.join(c for c in employee_name if c.isalnum() or c in (' ', '-', '_')).strip()
+        safe_name = safe_name.replace(' ', '_')
+        
+        # Create filename
+        filename = f"Payslip_{safe_name}_{timestamp}.pdf"
+        pdf_path = os.path.join(output_directory, filename)
+        
+        # Create a printer set to PDF output
+        printer = QPrinter()
+        printer.setOutputFormat(QPrinter.PdfFormat)
+        printer.setOutputFileName(pdf_path)
+
+        # Apply page settings
+        if page_settings.get("custom_size"):
+            custom_size = page_settings["custom_size"]
+            printer.setPaperSize(custom_size, QPrinter.Millimeter)
+        else:
+            printer.setPaperSize(page_settings.get("paper_size", QPrinter.B4))
+        
+        margins = page_settings.get("margins", {"top": 10, "bottom": 10, "left": 10, "right": 10})
+        printer.setPageMargins(
+            margins["left"], margins["top"], margins["right"], margins["bottom"], QPrinter.Millimeter
+        )
+        
+        # Create a text document with the content
+        doc = QTextDocument()
+        font = QFont("Courier New", 10)  # Use monospaced font
+        doc.setDefaultFont(font)
+        doc.setPlainText(content)
+        
+        # Apply padding (if needed, adjust content layout)
+        padding = page_settings.get("padding", 0)
+        doc.setDocumentMargin(padding)
+        
+        # Generate the PDF directly
+        doc.print_(printer)
+        
+        return pdf_path
+        
+    except Exception as e:
+        logger.error(f"PDF generation error for {employee_name}: {str(e)}")
+        return None
