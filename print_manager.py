@@ -75,7 +75,7 @@ class PDFGeneratorWorker(QThread):
         # Page settings: paper size, margins, and padding
         self.page_settings = page_settings or {
             "paper_size": QPrinter.B4,
-            "custom_size": QSizeF(220,200),  # Custom size as QSizeF(width, height) in millimeters
+            "custom_size": QSizeF(250,200),  # Custom size as QSizeF(width, height) in millimeters
             "margins": {"top": 5, "bottom": 10, "left": 10, "right": 10},  # Default margins in mm
             "padding": 0  
         }
@@ -197,7 +197,7 @@ class PayslipPDFGenerator:
         # Page settings: paper size, margins, and padding
         self.page_settings = {
             "paper_size": QPrinter.B5,
-            "custom_size": QSizeF(230,200),  # Custom size as QSizeF(width, height) in millimeters
+            "custom_size": QSizeF(250,200),  # Custom size as QSizeF(width, height) in millimeters
             "margins": {"top": 5, "bottom": 20, "left": 0, "right": 10},  # Default margins in mm
             "padding":0   # Default padding in mm
         }

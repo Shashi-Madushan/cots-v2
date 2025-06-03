@@ -102,9 +102,9 @@ def generate_fixed_payslip(row):
         f"{'INCENTIVE':<20}{row['INCENTIVE']:>12,.2f}",
         f"{'SHIFT ALLO':<20}{row['SHIFT ALLO']:>12,.2f}",
         f"{'DISCRETIONARY INC':<20}{row['Dis cre- Fuel']:>12,.2f}",
-        f"{'NORMAL OT':<20}{row['NORMAL OT']:>12,.2f}",
-        f"{'TRIPPLE OT':<20}{row['TRIPPLE OT']:>12,.2f}",
-        f"{'DOUBBLE OT':<20}{row['DOUBBLE OT']:>12,.2f}",
+        f"{'NORMAL OT':<20}{row['NORMAL OT']:>12,.2f}{row[row.index[row.index.get_loc('NORMAL OT') + 1]]:>5,.2f}",
+        f"{'TRIPPLE OT':<20}{row['TRIPPLE OT']:>12,.2f}{row[row.index[row.index.get_loc('TRIPPLE OT') + 1]]:>5,.2f}",
+        f"{'DOUBBLE OT':<20}{row['DOUBBLE OT']:>12,.2f}{row[row.index[row.index.get_loc('DOUBBLE OT') + 1]]:>5,.2f}",
         f"{'FIRST AID':<20}{row['FIRST AID']:>12,.2f}",
         f"{'FIRE TEAM':<20}{row['FIRE TEAM']:>12,.2f}",
         f"{'RELOCATION':<20}{row['RELOCATION']:>12,.2f}",
@@ -115,7 +115,7 @@ def generate_fixed_payslip(row):
         f"{'SPEC SOSU':<20}{row['SPEC SOSU']:>12,.2f}",
         f"{'TAX REFUD':<20}{row['TAX REFUD']:>12,.2f}",
         f"{'Sunday Wages':<20}{row['Sunday Wages']:>12,.2f}",
-        f"{'DOUBBLE OT':<20}{row['Arrears Double OT']:>12,.2f}",
+        f"{'Arrears Double OT':<20}{row['Arrears Double OT']:>12,.2f}{row[row.index[row.index.get_loc('Arrears Double OT') + 1]]:>5,.2f}",
     ]
 
     # List of deductions
@@ -196,15 +196,15 @@ def generate_ftc_payslip(row):
         f"{'ACTING AL':<25}{row.get('ACTING AL2', 0):>12,.2f}",
         f"{'INCENTIVE':<25}{row.get('INCENTIVE', 0):>12,.2f}",
         f"{'SHIFT ALLO':<25}{row.get('SHIFT ALLO', 0):>12,.2f}",
-        f"{'NORMAL OT':<25}{row.get('NORMAL OT', 0):>12,.2f}",
-        f"{'TRIPPLE OT':<25}{row.get('TRIPPLE OT', 0):>12,.2f}",
-        f"{'DOUBBLE OT':<25}{row.get('DOUBBLE OT', 0):>12,.2f}",
+        f"{'NORMAL OT':<25}{row.get('NORMAL OT', 0):>12,.2f}{row[row.index[row.index.get_loc('NORMAL OT') + 1]]:>5,.2f}",
+        f"{'TRIPPLE OT':<25}{row.get('TRIPPLE OT', 0):>12,.2f}{row[row.index[row.index.get_loc('TRIPLE OT') + 1]]:>5,.2f}",
+        f"{'DOUBBLE OT':<25}{row.get('DOUBBLE OT', 0):>12,.2f}{row[row.index[row.index.get_loc('DOUBBLE OT') + 1]]:>5,.2f}",
         f"{'FIRST AID':<25}{row.get('FIRST AID', 0):>12,.2f}",
         f"{'FIRE TEAM':<25}{row.get('FIRE TEAM', 0):>12,.2f}",
         f"{'RELOCATION':<25}{row.get('RELOCATION', 0):>12,.2f}",
         f"{'SOSU ALLOW':<25}{row.get('SOSU ALLOW', 0):>12,.2f}",
         f"{'Sunday Wages':<25}{row.get('Sunday Wages', 0):>12,.2f}",
-        f"{'Arrears Double OT':<25}{row.get('Arrears Double OT', 0):>12,.2f}",
+        f"{'Arrears Double OT':<25}{row.get('Arrears Double OT', 0):>12,.2f}{row[row.index[row.index.get_loc('Arrears Double OT') + 1]]:>5,.2f}",
     ]
 
     # Update deductions format to match fixed payslip
@@ -250,7 +250,7 @@ def generate_ftc_payslip(row):
 
     return payslip
 
-def combine_lines_fixed(earnings, deductions, left_width=25, value_width=12, spacer=2):
+def combine_lines_fixed(earnings, deductions, left_width=25, value_width=12, spacer=3):
     """Combine earnings and deductions into formatted lines."""
     combined_lines = []
     max_length = max(len(earnings), len(deductions))
@@ -262,7 +262,7 @@ def combine_lines_fixed(earnings, deductions, left_width=25, value_width=12, spa
         
         # Each item is already formatted as "{description} {value}"
         # Just need to combine them with proper spacing
-        left_space = "" * spacer
+        left_space = " " * spacer
         line = f"{left:<{left_width + value_width}}{left_space}{right}"
         combined_lines.append(line)
     
