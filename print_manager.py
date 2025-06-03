@@ -76,7 +76,7 @@ class PDFGeneratorWorker(QThread):
         self.page_settings = page_settings or {
             "paper_size": QPrinter.B4,
             "custom_size": QSizeF(220,200),  # Custom size as QSizeF(width, height) in millimeters
-            "margins": {"top": 10, "bottom": 10, "left": 10, "right": 10},  # Default margins in mm
+            "margins": {"top": 5, "bottom": 10, "left": 10, "right": 10},  # Default margins in mm
             "padding": 0  
         }
 
@@ -198,7 +198,7 @@ class PayslipPDFGenerator:
         self.page_settings = {
             "paper_size": QPrinter.B5,
             "custom_size": QSizeF(230,200),  # Custom size as QSizeF(width, height) in millimeters
-            "margins": {"top": 0, "bottom": 20, "left": 0, "right": 10},  # Default margins in mm
+            "margins": {"top": 5, "bottom": 20, "left": 0, "right": 10},  # Default margins in mm
             "padding":0   # Default padding in mm
         }
 
@@ -377,46 +377,14 @@ class PayslipPrintManager:
     def __init__(self, parent_widget):
         self.parent = parent_widget
         self.pdf_generator = PayslipPDFGenerator(parent_widget)
-        
+    
     def print_single_payslip(self, payslip_content, employee_name="Employee"):
-        """Print a single payslip directly to printer with B4 paper size"""
-        try:
-            # Create a printer
-            printer = QPrinter()
-            
-            # Apply the same page settings used for PDF generation
-            apply_page_settings_to_printer(printer, self.pdf_generator.page_settings)
-            printer.setOrientation(QPrinter.Portrait)
-            
-            # Show print dialog
-            print_dialog = QPrintDialog(printer, self.parent)
-            if print_dialog.exec_() == QPrintDialog.Accepted:
-                # Set up the document for printing
-                doc = QTextDocument()
-                font = QFont("Courier New", 10)
-                doc.setDefaultFont(font)
-                doc.setPlainText(payslip_content)
-                
-                # Apply padding from page settings
-                padding = self.pdf_generator.page_settings.get("padding", 0)
-                doc.setDocumentMargin(padding)
-                
-                # Print the document
-                doc.print_(printer)
-                
-                logger.info(f"Payslip printed for {employee_name}")
-                return True
-            else:
-                logger.info(f"Print cancelled for {employee_name}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Error printing payslip for {employee_name}: {str(e)}")
-            QMessageBox.critical(self.parent, "Print Error", f"Error printing payslip: {str(e)}")
-            return False
+        """Print a single payslip directly to printer with appropriate page settings"""
+        return self._print_payslips([{"content": payslip_content, "name": employee_name}], 
+                                   title="Print Payslip")
     
     def print_with_preview(self, payslip_content, employee_name="Employee"):
-        """Show print preview dialog before printing with B4 paper size"""
+        """Show print preview dialog before printing with appropriate page settings"""
         try:
             # Create a printer
             printer = QPrinter()
@@ -470,11 +438,46 @@ class PayslipPrintManager:
         return self.pdf_generator.generate_bulk_pdfs(employees, content_generator, ask_directory)
     
     def print_bulk_payslips(self, employees, content_generator):
-        """Print multiple payslips directly to printer with B4 paper size"""
+        """Print multiple payslips directly to printer with appropriate page settings"""
         if not employees:
             QMessageBox.warning(self.parent, "No Data", "No employees selected for printing.")
             return False
         
+        # Generate all payslip contents
+        payslips = []
+        for employee in employees:
+            try:
+                emp_name = employee.get('name', 'Employee')
+                payslip_content = content_generator(employee)
+                payslips.append({
+                    "content": payslip_content,
+                    "name": emp_name
+                })
+            except Exception as e:
+                logger.error(f"Error generating payslip content for {employee.get('name', 'Employee')}: {str(e)}")
+                # Continue with other payslips even if one fails
+        
+        if not payslips:
+            QMessageBox.warning(self.parent, "Generation Error", "Failed to generate any payslips for printing.")
+            return False
+            
+        # Print all the generated payslips
+        return self._print_payslips(payslips, title="Print All Payslips")
+    
+    def _print_payslips(self, payslips, title="Print Payslips"):
+        """
+        Common function to print one or more payslips
+        
+        Args:
+            payslips: List of dictionaries with 'content' and 'name' keys for each payslip
+            title: Title for the print dialog
+            
+        Returns:
+            Boolean indicating success or failure
+        """
+        if not payslips:
+            return False
+            
         try:
             # Create a printer
             printer = QPrinter()
@@ -483,27 +486,24 @@ class PayslipPrintManager:
             apply_page_settings_to_printer(printer, self.pdf_generator.page_settings)
             printer.setOrientation(QPrinter.Portrait)
             
-            # Show print dialog for the first payslip
+            # Show print dialog
             print_dialog = QPrintDialog(printer, self.parent)
-            print_dialog.setWindowTitle("Print All Payslips")
+            print_dialog.setWindowTitle(title)
             
             if print_dialog.exec_() != QPrintDialog.Accepted:
-                logger.info("Bulk print cancelled by user")
+                logger.info("Print cancelled by user")
                 return False
             
             success_count = 0
             error_count = 0
             
-            for employee in employees:
+            for payslip in payslips:
                 try:
-                    emp_name = employee.get('name', 'Employee')
-                    payslip_content = content_generator(employee)
-                    
                     # Set up the document for printing
                     doc = QTextDocument()
                     font = QFont("Courier New", 10)
                     doc.setDefaultFont(font)
-                    doc.setPlainText(payslip_content)
+                    doc.setPlainText(payslip["content"])
                     
                     # Apply padding from page settings
                     padding = self.pdf_generator.page_settings.get("padding", 0)
@@ -513,24 +513,26 @@ class PayslipPrintManager:
                     doc.print_(printer)
                     
                     success_count += 1
-                    logger.info(f"Printed payslip for {emp_name}")
+                    logger.info(f"Printed payslip for {payslip['name']}")
                     
                 except Exception as e:
                     error_count += 1
-                    logger.error(f"Error printing payslip for employee: {str(e)}")
+                    logger.error(f"Error printing payslip for {payslip['name']}: {str(e)}")
             
-            # Show completion message
-            message = (
-                f"Bulk printing completed.\n"
-                f"Successfully printed: {success_count}\n"
-                f"Failed: {error_count}"
-            )
-            QMessageBox.information(self.parent, "Bulk Print Complete", message)
+            # Show completion message if multiple payslips were printed
+            if len(payslips) > 1:
+                message = (
+                    f"Printing completed.\n"
+                    f"Successfully printed: {success_count}\n"
+                    f"Failed: {error_count}"
+                )
+                QMessageBox.information(self.parent, "Print Complete", message)
+                
             return success_count > 0
             
         except Exception as e:
-            logger.error(f"Error in bulk printing: {str(e)}")
-            QMessageBox.critical(self.parent, "Print Error", f"Error in bulk printing: {str(e)}")
+            logger.error(f"Error in printing: {str(e)}")
+            QMessageBox.critical(self.parent, "Print Error", f"Error in printing: {str(e)}")
             return False
     
     @property
