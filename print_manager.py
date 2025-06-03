@@ -383,8 +383,9 @@ class PayslipPrintManager:
         try:
             # Create a printer
             printer = QPrinter()
-            printer.setPaperSize(QPrinter.B4)
-            printer.setPageSize(QPrinter.B4)
+            
+            # Apply the same page settings used for PDF generation
+            apply_page_settings_to_printer(printer, self.pdf_generator.page_settings)
             printer.setOrientation(QPrinter.Portrait)
             
             # Show print dialog
@@ -395,6 +396,10 @@ class PayslipPrintManager:
                 font = QFont("Courier New", 10)
                 doc.setDefaultFont(font)
                 doc.setPlainText(payslip_content)
+                
+                # Apply padding from page settings
+                padding = self.pdf_generator.page_settings.get("padding", 0)
+                doc.setDocumentMargin(padding)
                 
                 # Print the document
                 doc.print_(printer)
@@ -415,8 +420,9 @@ class PayslipPrintManager:
         try:
             # Create a printer
             printer = QPrinter()
-            printer.setPaperSize(QPrinter.B4)
-            printer.setPageSize(QPrinter.B4)
+            
+            # Apply the same page settings used for PDF generation
+            apply_page_settings_to_printer(printer, self.pdf_generator.page_settings)
             printer.setOrientation(QPrinter.Portrait)
             
             # Create print preview dialog
@@ -429,6 +435,11 @@ class PayslipPrintManager:
                 font = QFont("Courier New", 10)
                 doc.setDefaultFont(font)
                 doc.setPlainText(payslip_content)
+                
+                # Apply padding from page settings
+                padding = self.pdf_generator.page_settings.get("padding", 0)
+                doc.setDocumentMargin(padding)
+                
                 doc.print_(printer)
             
             preview_dialog.paintRequested.connect(print_preview)
@@ -467,8 +478,9 @@ class PayslipPrintManager:
         try:
             # Create a printer
             printer = QPrinter()
-            printer.setPaperSize(QPrinter.B4)
-            printer.setPageSize(QPrinter.B4)
+            
+            # Apply the same page settings used for PDF generation
+            apply_page_settings_to_printer(printer, self.pdf_generator.page_settings)
             printer.setOrientation(QPrinter.Portrait)
             
             # Show print dialog for the first payslip
@@ -492,6 +504,10 @@ class PayslipPrintManager:
                     font = QFont("Courier New", 10)
                     doc.setDefaultFont(font)
                     doc.setPlainText(payslip_content)
+                    
+                    # Apply padding from page settings
+                    padding = self.pdf_generator.page_settings.get("padding", 0)
+                    doc.setDocumentMargin(padding)
                     
                     # Print the document
                     doc.print_(printer)
@@ -523,6 +539,29 @@ class PayslipPrintManager:
         return self.pdf_generator.output_directory
 
 
+# Common function to apply page settings to printer
+def apply_page_settings_to_printer(printer, page_settings):
+    """
+    Apply page settings from config to a printer instance
+    
+    Args:
+        printer: QPrinter instance to configure
+        page_settings: Dictionary containing paper size, margins, and padding settings
+    """
+    # Apply paper size
+    if page_settings.get("custom_size"):
+        custom_size = page_settings["custom_size"]
+        printer.setPaperSize(custom_size, QPrinter.Millimeter)
+    else:
+        printer.setPaperSize(page_settings.get("paper_size", QPrinter.B4))
+    
+    # Apply margins
+    margins = page_settings.get("margins", {"top": 10, "bottom": 10, "left": 10, "right": 10})
+    printer.setPageMargins(
+        margins["left"], margins["top"], margins["right"], margins["bottom"], QPrinter.Millimeter
+    )
+
+
 # Common PDF generation function used by both single and bulk operations
 def generate_pdf(content, employee_name, output_directory, timestamp, page_settings):
     """
@@ -552,17 +591,8 @@ def generate_pdf(content, employee_name, output_directory, timestamp, page_setti
         printer.setOutputFormat(QPrinter.PdfFormat)
         printer.setOutputFileName(pdf_path)
 
-        # Apply page settings
-        if page_settings.get("custom_size"):
-            custom_size = page_settings["custom_size"]
-            printer.setPaperSize(custom_size, QPrinter.Millimeter)
-        else:
-            printer.setPaperSize(page_settings.get("paper_size", QPrinter.B4))
-        
-        margins = page_settings.get("margins", {"top": 10, "bottom": 10, "left": 10, "right": 10})
-        printer.setPageMargins(
-            margins["left"], margins["top"], margins["right"], margins["bottom"], QPrinter.Millimeter
-        )
+        # Apply page settings using the common function
+        apply_page_settings_to_printer(printer, page_settings)
         
         # Create a text document with the content
         doc = QTextDocument()
