@@ -75,8 +75,8 @@ class PDFGeneratorWorker(QThread):
         # Page settings: paper size, margins, and padding
         self.page_settings = page_settings or {
             "paper_size": QPrinter.B4,
-            "custom_size": QSizeF(250,200),  # Custom size as QSizeF(width, height) in millimeters
-            "margins": {"top": 5, "bottom": 10, "left": 10, "right": 10},  # Default margins in mm
+            "custom_size": QSizeF(220,200),  # Custom size as QSizeF(width, height) in millimeters
+            "margins": {"top": 0, "bottom": 0, "left": 0, "right": 0},  # Default margins in mm
             "padding": 0  
         }
 
@@ -197,8 +197,8 @@ class PayslipPDFGenerator:
         # Page settings: paper size, margins, and padding
         self.page_settings = {
             "paper_size": QPrinter.B5,
-            "custom_size": QSizeF(250,200),  # Custom size as QSizeF(width, height) in millimeters
-            "margins": {"top": 5, "bottom": 20, "left": 0, "right": 10},  # Default margins in mm
+            "custom_size": QSizeF(220,200),  # Custom size as QSizeF(width, height) in millimeters
+            "margins": {"top": 0, "bottom": 0, "left": 0, "right": 0},  # Default margins in mm
             "padding":0   # Default padding in mm
         }
 
@@ -350,18 +350,21 @@ class PayslipPDFGenerator:
         QMessageBox.information(self.parent, "PDF Generation Complete", message)
 
     def _setup_document_for_print(self, printer, content):
-        """Set up the document for PDF generation with monospaced font and B4 paper size"""
+        """Set up the document for PDF generation with monospaced font and configured page settings"""
         from PyQt5.QtGui import QTextDocument, QFont
         
-        # Make sure the printer is set to B4
-        printer.setPaperSize(QPrinter.B4)
-        printer.setPageSize(QPrinter.B4)
+        # Apply the configured page settings
+        apply_page_settings_to_printer(printer, self.page_settings)
         
         # Create a text document with the content
         doc = QTextDocument()
         font = QFont("Courier New", 10)  # Use monospaced font
         doc.setDefaultFont(font)
         doc.setPlainText(content)
+        
+        # Apply padding from page settings
+        padding = self.page_settings.get("padding", 0)
+        doc.setDocumentMargin(padding)
         
         # Generate the PDF
         doc.print_(printer)
@@ -557,11 +560,16 @@ def apply_page_settings_to_printer(printer, page_settings):
     else:
         printer.setPaperSize(page_settings.get("paper_size", QPrinter.B4))
     
-    # Apply margins
-    margins = page_settings.get("margins", {"top": 10, "bottom": 10, "left": 10, "right": 10})
-    printer.setPageMargins(
-        margins["left"], margins["top"], margins["right"], margins["bottom"], QPrinter.Millimeter
-    )
+    # Apply margins with numeric defaults
+    margins = page_settings.get("margins", {"top": 0, "bottom": 0, "left": 0, "right": 0})
+    
+    # Convert any "auto" or non-numeric values to 0
+    margin_left = float(margins["left"]) if isinstance(margins["left"], (int, float)) else 0
+    margin_top = float(margins["top"]) if isinstance(margins["top"], (int, float)) else 0
+    margin_right = float(margins["right"]) if isinstance(margins["right"], (int, float)) else 0
+    margin_bottom = float(margins["bottom"]) if isinstance(margins["bottom"], (int, float)) else 0
+    
+    printer.setPageMargins(margin_left, margin_top, margin_right, margin_bottom, QPrinter.Millimeter)
 
 
 # Common PDF generation function used by both single and bulk operations

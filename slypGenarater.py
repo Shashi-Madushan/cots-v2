@@ -148,14 +148,14 @@ def generate_fixed_payslip(row):
 
     # Footer aligned
     footer_lines = [
-        f"{'TOT EARNINGS':<18}  {row['TOT EARN']:>12,.2f}    {' TOT DEDUCTIONS':<18}  {row['TOT DED']:>8,.2f}",
+        f"{'TOT EARNINGS':<18}  {row['TOT EARN']:>12,.2f}       {' TOT DEDUCTIONS':<18}  {row['TOT DED']:>8,.2f}",
         "",
-        f"{'EPF YEE 8%':<18}  {row['EPF YEE']:>12,.2f}    {' NET PAY':<16}  {row['netpay']:>10,.2f}",
-        f"{'ETF YER 3%':<18}  {row['ETF YER']:>12,.2f}    {' BANK PAYMENT':<16}  {row['netpay']:>10,.2f}",
+        f"{'EPF YEE 8%':<18}  {row['EPF YEE']:>12,.2f}       {' NET PAY':<16}  {row['netpay']:>10,.2f}",
+        f"{'ETF YER 3%':<18}  {row['ETF YER']:>12,.2f}       {' BANK PAYMENT':<16}  {row['netpay']:>10,.2f}",
         f"{'EPF YER 12%':<18}  {row['EPF YER']:>12,.2f}",
         f"{'TOTAL EPF':<18}  {row['TOTAL EPF']:>12,.2f}",
         "",  # Blank line
-        f"{'BANK':<10}  {str(row[14])}   {row['BRANCH NAME']}     {'A/C NO':<12}  {str(int(float(row['A/C NO'])))}",
+        f"{'BANK':<10}  {str(row[14])}   {row['BRANCH NAME']}       {'A/C NO':<12}  {str(int(float(row['A/C NO'])))}",
     ]
 
     # Combine all parts
@@ -190,21 +190,21 @@ def generate_ftc_payslip(row):
 
     # Update earnings format to match fixed payslip
     earnings = [
-        f"{'BASIC SAL':<25}{row.get('BASIC SAL', 0):>12,.2f}",
-        f"{'B.R ALLOWA':<25}{row.get('B.R ALLOWA', 0):>12,.2f}",
-        f"{'MEDICAL':<25}{row.get('MEDICAL', 0):>12,.2f}",
-        f"{'ACTING AL':<25}{row.get('ACTING AL2', 0):>12,.2f}",
-        f"{'INCENTIVE':<25}{row.get('INCENTIVE', 0):>12,.2f}",
-        f"{'SHIFT ALLO':<25}{row.get('SHIFT ALLO', 0):>12,.2f}",
-        f"{'NORMAL OT':<25}{row.get('NORMAL OT', 0):>12,.2f}{row[row.index[row.index.get_loc('NORMAL OT') + 1]]:>5,.2f}",
-        f"{'TRIPPLE OT':<25}{row.get('TRIPPLE OT', 0):>12,.2f}{row[row.index[row.index.get_loc('TRIPLE OT') + 1]]:>5,.2f}",
-        f"{'DOUBBLE OT':<25}{row.get('DOUBBLE OT', 0):>12,.2f}{row[row.index[row.index.get_loc('DOUBBLE OT') + 1]]:>5,.2f}",
-        f"{'FIRST AID':<25}{row.get('FIRST AID', 0):>12,.2f}",
-        f"{'FIRE TEAM':<25}{row.get('FIRE TEAM', 0):>12,.2f}",
-        f"{'RELOCATION':<25}{row.get('RELOCATION', 0):>12,.2f}",
-        f"{'SOSU ALLOW':<25}{row.get('SOSU ALLOW', 0):>12,.2f}",
-        f"{'Sunday Wages':<25}{row.get('Sunday Wages', 0):>12,.2f}",
-        f"{'Arrears Double OT':<25}{row.get('Arrears Double OT', 0):>12,.2f}{row[row.index[row.index.get_loc('Arrears Double OT') + 1]]:>5,.2f}",
+        f"{'B.R ALLOWA':<20}{row.get('B.R ALLOWA', 0):>12,.2f}",
+        f"{'BASIC SAL':<20}{row.get('BASIC SAL', 0):>12,.2f}",
+        f"{'MEDICAL':<20}{row.get('MEDICAL', 0):>12,.2f}",
+        f"{'ACTING AL':<20}{row.get('ACTING AL2', 0):>12,.2f}",
+        f"{'INCENTIVE':<20}{row.get('INCENTIVE', 0):>12,.2f}",
+        f"{'SHIFT ALLO':<20}{row.get('SHIFT ALLO', 0):>12,.2f}",
+        f"{'NORMAL OT':<20}{row.get('NORMAL OT', 0):>12,.2f}{row[row.index[row.index.get_loc('NORMAL OT') + 1]]:>5,.2f}",
+        f"{'TRIPPLE OT':<20}{row.get('TRIPPLE OT', 0):>12,.2f}{row[row.index[row.index.get_loc('TRIPLE OT') + 1]]:>5,.2f}",
+        f"{'DOUBBLE OT':<20}{row.get('DOUBBLE OT', 0):>12,.2f}{row[row.index[row.index.get_loc('DOUBBLE OT') + 1]]:>5,.2f}",
+        f"{'FIRST AID':<20}{row.get('FIRST AID', 0):>12,.2f}",
+        f"{'FIRE TEAM':<20}{row.get('FIRE TEAM', 0):>12,.2f}",
+        f"{'RELOCATION':<20}{row.get('RELOCATION', 0):>12,.2f}",
+        f"{'SOSU ALLOW':<20}{row.get('SOSU ALLOW', 0):>12,.2f}",
+        f"{'Sunday Wages':<20}{row.get('Sunday Wages', 0):>12,.2f}",
+        f"{'Arrears Double OT':<20}{row.get('Arrears Double OT', 0):>12,.2f}{row[row.index[row.index.get_loc('Arrears Double OT') + 1]]:>5,.2f}",
     ]
 
     # Update deductions format to match fixed payslip
@@ -235,12 +235,12 @@ def generate_ftc_payslip(row):
 
     # Footer aligned like fixed payslip
     footer_lines = [
-        f"{'TOT EARNINGS':<23}  {row.get('TOT EARN', 0):>12,.2f}    {'TOT DEDUCTIONS':<15}  {row.get('total deduction', 0):>10,.2f}",
+        f"{'TOT EARNINGS':<18}  {row.get('TOT EARN', 0):>12,.2f}         {'TOT DEDUCTIONS':<15}  {row.get('total deduction', 0):>10,.2f}",
         "",
-        f"{'EPF YEE 8%':<23}  {row.get('EPF YEE', 0):>12,.2f}    {'NET PAY':<15}  {row.get('NETPAY', 0):>10,.2f}",
-        f"{'ETF YER 3%':<23}  {row.get('ETF YER', 0):>12,.2f}    {'BANK PAYMENT':<15}  {row.get('NETPAY', 0):>10,.2f}",
-        f"{'EPF YER 12%':<23}  {row.get('EPF YER', 0):>12,.2f}",
-        f"{'TOTAL EPF':<23}  {row.get('TOTAL EPF', 0):>12,.2f}",
+        f"{'EPF YEE 8%':<18}  {row.get('EPF YEE', 0):>12,.2f}         {'NET PAY':<15}  {row.get('NETPAY', 0):>10,.2f}",
+        f"{'ETF YER 3%':<18}  {row.get('ETF YER', 0):>12,.2f}         {'BANK PAYMENT':<15}  {row.get('NETPAY', 0):>10,.2f}",
+        f"{'EPF YER 12%':<18}  {row.get('EPF YER', 0):>12,.2f}",
+        f"{'TOTAL EPF':<18}  {row.get('TOTAL EPF', 0):>12,.2f}",
         "",  # Blank line
         f"{'BANK':<10}  {row.get('BANK CODE', ''):<15}  {row.get('BRANCH', ''):<10}  {'A/C NO':<12}  {str(int(float(row.get('A/C NO', 0)))):<15}",
     ]
