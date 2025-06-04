@@ -305,34 +305,15 @@ class ExcelSheetViewer(QMainWindow):
 
         try:
             current_sheet = self.sheet_list.currentItem().text()
-            
-            # Ask user if they want to save text files or PDFs (or both)
-            choice = QMessageBox.question(
-                self, 
-                "Bulk Generation Options",
-                "Choose output format:\n\nYes = Generate PDFs\nNo = Generate Text Files\nCancel = Both PDFs and Text Files",
-                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
-                QMessageBox.Yes
-            )
-            
-            if choice == QMessageBox.Yes:
-                # Generate PDFs only
-                self._generate_bulk_pdfs_only(current_sheet)
-            elif choice == QMessageBox.No:
-                # Generate text files only
-                self._generate_bulk_text_files(current_sheet)
-            else:  # Cancel = Both
-                # Generate both PDFs and text files
-                self._generate_bulk_both_formats(current_sheet)
-
+            self._generate_bulk_pdfs(current_sheet)
         except Exception as e:
             error_msg = f"Error in bulk generation: {str(e)}"
             logger.error(error_msg)
             logger.exception("Detailed error:")
             QMessageBox.critical(self, "Error", error_msg)
 
-    def _generate_bulk_pdfs_only(self, current_sheet):
-        """Generate PDFs only for bulk payslips with directory chooser"""
+    def _generate_bulk_pdfs(self, current_sheet):
+        """Generate PDFs for bulk payslips with directory chooser"""
         progress = None
         try:
             # Prepare data for bulk PDF generation
@@ -371,7 +352,7 @@ class ExcelSheetViewer(QMainWindow):
                 progress.close()
                 progress.deleteLater()
                 progress = None
-                QApplication.processEvents()  # Ensure dialog is closed
+                QApplication.processEvents()
             
             # Define a content generator function
             def content_generator(employee):
@@ -393,120 +374,6 @@ class ExcelSheetViewer(QMainWindow):
                 QApplication.processEvents()
             
             error_msg = f"Error in PDF generation: {str(e)}"
-            logger.error(error_msg)
-            QMessageBox.critical(self, "Error", error_msg)
-
-    def _generate_bulk_text_files(self, current_sheet):
-        """Generate text files for bulk payslips"""
-        save_dir = QFileDialog.getExistingDirectory(
-            self, "Select Directory to Save Payslips"
-        )
-        
-        if save_dir:
-            success_count = 0
-            error_count = 0
-            total_rows = len(self.current_df)
-            
-            for index, row_data in self.current_df.iterrows():
-                try:
-                    payslip = generate_payslip(row_data, current_sheet)
-                    
-                    # Show current payslip in UI
-                    self.payslip_preview.setText(payslip)
-                    QApplication.processEvents()  # Update UI
-                    
-                    # Generate filename using employee information
-                    emp_id = str(row_data.get('EMP_ID', index))
-                    emp_name = str(row_data.get('NAME', 'employee'))
-                    filename = f"payslip_{emp_id}_{emp_name}.txt"
-                    # Remove any invalid characters from filename
-                    filename = "".join(c for c in filename if c.isalnum() or c in ('_', '-', '.'))
-                    
-                    file_path = os.path.join(save_dir, filename)
-                    
-                    with open(file_path, 'w', encoding='utf-8') as f:
-                        f.write(payslip)
-                    
-                    success_count += 1
-                    self.status_label.setText(
-                        f"Status: Generating payslips... ({success_count}/{total_rows})"
-                    )
-                    QApplication.processEvents()  # Keep UI responsive
-                    
-                except Exception as e:
-                    logger.error(f"Error generating payslip for row {index}: {str(e)}")
-                    error_count += 1
-
-            final_message = (
-                f"Payslip generation completed.\n"
-                f"Successfully generated: {success_count}\n"
-                f"Failed: {error_count}"
-            )
-            QMessageBox.information(self, "Generation Complete", final_message)
-            self.status_label.setText(
-                f"Status: Generated {success_count} text payslips with {error_count} errors"
-            )
-
-    def _generate_bulk_both_formats(self, current_sheet):
-        """Generate both PDFs and text files for bulk payslips with directory choosers"""
-        save_dir = QFileDialog.getExistingDirectory(
-            self, "Select Directory to Save Text Payslips"
-        )
-        
-        if not save_dir:
-            return
-            
-        try:
-            employees = []
-            success_count = 0
-            error_count = 0
-            total_rows = len(self.current_df)
-            
-            for index, row_data in self.current_df.iterrows():
-                try:
-                    payslip = generate_payslip(row_data, current_sheet)
-                    
-                    # Show current payslip in UI
-                    self.payslip_preview.setText(payslip)
-                    QApplication.processEvents()  # Update UI
-                    
-                    # Save text file
-                    emp_id = str(row_data.get('EMP_ID', index))
-                    emp_name = str(row_data.get('NAME', 'employee'))
-                    filename = f"payslip_{emp_id}_{emp_name}.txt"
-                    filename = "".join(c for c in filename if c.isalnum() or c in ('_', '-', '.'))
-                    
-                    file_path = os.path.join(save_dir, filename)
-                    with open(file_path, 'w', encoding='utf-8') as f:
-                        f.write(payslip)
-                    
-                    # Prepare for PDF generation
-                    employee_data = {'name': emp_name, 'data': row_data, 'sheet': current_sheet}
-                    employees.append(employee_data)
-                    
-                    success_count += 1
-                    self.status_label.setText(
-                        f"Status: Processing payslips... ({success_count}/{total_rows})"
-                    )
-                    QApplication.processEvents()
-                    
-                except Exception as e:
-                    logger.error(f"Error generating payslip for row {index}: {str(e)}")
-                    error_count += 1
-
-            # Generate PDFs with directory chooser
-            def content_generator(employee):
-                return generate_payslip(employee['data'], employee['sheet'])
-            
-            if employees:
-                self.printer.generate_bulk_pdfs(employees, content_generator, ask_directory=True)
-                
-            self.status_label.setText(
-                f"Status: Generated {success_count} text payslips with {error_count} errors. PDF generation started..."
-            )
-            
-        except Exception as e:
-            error_msg = f"Error in combined generation: {str(e)}"
             logger.error(error_msg)
             QMessageBox.critical(self, "Error", error_msg)
 
