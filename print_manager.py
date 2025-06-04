@@ -51,7 +51,7 @@ class PDFGeneratorWorker(QThread):
     process_finished = pyqtSignal(int, int)  # success_count, error_count
     single_pdf_complete = pyqtSignal(bool, str)  # success, message
 
-    def __init__(self, employees, content_generator, output_directory=None, page_settings=None):
+    def __init__(self, employees, content_generator, output_directory=None):
         """
         Initialize PDF generator worker
         
@@ -64,21 +64,9 @@ class PDFGeneratorWorker(QThread):
         self.employees = employees
         self.content_generator = content_generator
         self.cancelled = False
-        
-        # Use provided output directory or default to ~/Payslips
         self.output_directory = output_directory or os.path.join(os.path.expanduser("~"), "Payslips")
-        
-        # Create output directory if it doesn't exist
         if not os.path.exists(self.output_directory):
             os.makedirs(self.output_directory)
-        
-        # Page settings: paper size, margins, and padding
-        self.page_settings = page_settings or {
-            "paper_size": QPrinter.B4,
-            "custom_size": QSizeF(220,200),  # Custom size as QSizeF(width, height) in millimeters
-            "margins": {"top": 0, "bottom": 0, "left": 0, "right": 0},  # Default margins in mm
-            "padding": 0  
-        }
 
     def run(self):
         """Process all payslips for PDF generation, creating each PDF on demand"""
@@ -106,7 +94,7 @@ class PDFGeneratorWorker(QThread):
                 # Generate PDF using the common generator function
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
                 pdf_path = generate_pdf(payslip_content, emp_name, self.output_directory, 
-                                      timestamp, self.page_settings)
+                                      timestamp)
                 if pdf_path:
                     success_count += 1
                     self.single_pdf_complete.emit(True, f"Generated PDF for {emp_name} at {pdf_path}")
@@ -175,6 +163,81 @@ class PDFProgressDialog(QDialog):
         self.current_job.setText(message)
 
 
+class PageSettingsManager:
+    """Centralized manager for page settings configuration using Singleton pattern"""
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(PageSettingsManager, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self):
+        if not self._initialized:
+            self._settings = {
+                "paper_size": QPrinter.B5,
+                "custom_size": QSizeF(220, 200),
+                "margins": {"top": 0, "bottom": 0, "left": 0, "right": 0},
+                "padding": 0,
+                "orientation": QPrinter.Portrait,
+                "font_family": "Courier New",
+                "font_size": 10
+            }
+            self._initialized = True
+
+    def configure_printer(self, printer):
+        """Configure all printer settings in one place"""
+        if self._settings.get("custom_size"):
+            printer.setPaperSize(self._settings["custom_size"], QPrinter.Millimeter)
+        else:
+            printer.setPaperSize(self._settings.get("paper_size", QPrinter.B4))
+        
+        margins = self._settings.get("margins", {"top": 0, "bottom": 0, "left": 0, "right": 0})
+        printer.setPageMargins(
+            float(margins["left"]), 
+            float(margins["top"]), 
+            float(margins["right"]), 
+            float(margins["bottom"]), 
+            QPrinter.Millimeter
+        )
+        printer.setOrientation(self._settings.get("orientation", QPrinter.Portrait))
+        printer.setFullPage(True)  # Enable full page printing
+
+    def configure_document(self, doc):
+        """Configure document settings"""
+        font = QFont(
+            self._settings.get("font_family", "Courier New"),
+            self._settings.get("font_size", 10)
+        )
+        doc.setDefaultFont(font)
+
+    def update(self, paper_size=None, custom_size=None, margins=None, padding=None, 
+              orientation=None, font_family=None, font_size=None):
+        """Update settings"""
+        if paper_size:
+            self._settings["paper_size"] = paper_size
+            self._settings["custom_size"] = None
+        if custom_size:
+            self._settings["custom_size"] = QSizeF(*custom_size)
+            self._settings["paper_size"] = None
+        if margins:
+            self._settings["margins"] = margins
+        if padding is not None:
+            self._settings["padding"] = padding
+        if orientation is not None:
+            self._settings["orientation"] = orientation
+        if font_family:
+            self._settings["font_family"] = font_family
+        if font_size:
+            self._settings["font_size"] = font_size
+
+    @property
+    def settings(self):
+        """Get current settings"""
+        return self._settings.copy()
+
+
 class PayslipPDFGenerator:
     """Main class for handling payslip PDF generation"""
     def __init__(self, parent_widget):
@@ -194,26 +257,12 @@ class PayslipPDFGenerator:
                 logger.error(f"Error creating output directory: {str(e)}")
                 self.output_directory = os.path.expanduser("~")
         
-        # Page settings: paper size, margins, and padding
-        self.page_settings = {
-            "paper_size": QPrinter.B5,
-            "custom_size": QSizeF(220,200),  # Custom size as QSizeF(width, height) in millimeters
-            "margins": {"top": 0, "bottom": 0, "left": 0, "right": 0},  # Default margins in mm
-            "padding":0   # Default padding in mm
-        }
+        # Use singleton page settings manager
+        self.page_settings_manager = PageSettingsManager()
 
     def set_page_settings(self, paper_size=None, custom_size=None, margins=None, padding=None):
         """Set custom page settings"""
-        if paper_size:
-            self.page_settings["paper_size"] = paper_size
-            self.page_settings["custom_size"] = None  # Reset custom size if paper size is set
-        if custom_size:
-            self.page_settings["custom_size"] = QSizeF(*custom_size)  # Expect tuple (width, height)
-            self.page_settings["paper_size"] = None  # Reset paper size if custom size is set
-        if margins:
-            self.page_settings["margins"] = margins
-        if padding is not None:
-            self.page_settings["padding"] = padding
+        self.page_settings_manager.update(paper_size, custom_size, margins, padding)
 
     def get_output_directory(self, title="Select Output Folder"):
         """Get output directory from user via file dialog"""
@@ -267,7 +316,7 @@ class PayslipPDFGenerator:
             
             # Generate PDF using the common generator function
             pdf_path = generate_pdf(payslip_content, employee_name, output_dir, 
-                                  timestamp, self.page_settings)
+                                  timestamp)
             
             if pdf_path:
                 # Update the output directory for status message
@@ -314,7 +363,7 @@ class PayslipPDFGenerator:
             self.progress_dialog.show()
             
             # Create worker thread with employees list, content generator, and output directory
-            self.pdf_worker = PDFGeneratorWorker(employees, content_generator, output_dir, self.page_settings)
+            self.pdf_worker = PDFGeneratorWorker(employees, content_generator, output_dir)
             self.pdf_worker.progress_updated.connect(self.progress_dialog.update_progress)
             self.pdf_worker.single_pdf_complete.connect(self.progress_dialog.update_current_job)
             self.pdf_worker.process_finished.connect(lambda success, error: 
@@ -351,22 +400,12 @@ class PayslipPDFGenerator:
 
     def _setup_document_for_print(self, printer, content):
         """Set up the document for PDF generation with monospaced font and configured page settings"""
-        from PyQt5.QtGui import QTextDocument, QFont
-        
-        # Apply the configured page settings
-        apply_page_settings_to_printer(printer, self.page_settings)
-        
-        # Create a text document with the content
         doc = QTextDocument()
-        font = QFont("Courier New", 10)  # Use monospaced font
-        doc.setDefaultFont(font)
         doc.setPlainText(content)
         
-        # Apply padding from page settings
-        padding = self.page_settings.get("padding", 0)
-        doc.setDocumentMargin(padding)
+        self.page_settings_manager.configure_printer(printer)
+        self.page_settings_manager.configure_document(doc)
         
-        # Generate the PDF
         doc.print_(printer)
 
 
@@ -393,7 +432,7 @@ class PayslipPrintManager:
             printer = QPrinter()
             
             # Apply the same page settings used for PDF generation
-            apply_page_settings_to_printer(printer, self.pdf_generator.page_settings)
+            self.pdf_generator.page_settings_manager.configure_printer(printer)
             printer.setOrientation(QPrinter.Portrait)
             
             # Create print preview dialog
@@ -403,14 +442,10 @@ class PayslipPrintManager:
             # Connect preview signal
             def print_preview(printer):
                 doc = QTextDocument()
-                font = QFont("Courier New", 10)
-                doc.setDefaultFont(font)
                 doc.setPlainText(payslip_content)
                 
-                # Apply padding from page settings
-                padding = self.pdf_generator.page_settings.get("padding", 0)
-                doc.setDocumentMargin(padding)
-                
+                # Configure document settings through page settings manager
+                self.pdf_generator.page_settings_manager.configure_document(doc)
                 doc.print_(printer)
             
             preview_dialog.paintRequested.connect(print_preview)
@@ -446,7 +481,7 @@ class PayslipPrintManager:
             QMessageBox.warning(self.parent, "No Data", "No employees selected for printing.")
             return False
         
-        # Generate all payslip contents
+        # Generate all the payslip contents
         payslips = []
         for employee in employees:
             try:
@@ -468,25 +503,18 @@ class PayslipPrintManager:
         return self._print_payslips(payslips, title="Print All Payslips")
     
     def _print_payslips(self, payslips, title="Print Payslips"):
-        """
-        Common function to print one or more payslips
-        
-        Args:
-            payslips: List of dictionaries with 'content' and 'name' keys for each payslip
-            title: Title for the print dialog
-            
-        Returns:
-            Boolean indicating success or failure
-        """
+        """Common function to print one or more payslips"""
         if not payslips:
             return False
             
         try:
             # Create a printer
             printer = QPrinter()
+            printer.setFullPage(True)  # Enable full page printing
+
             
             # Apply the same page settings used for PDF generation
-            apply_page_settings_to_printer(printer, self.pdf_generator.page_settings)
+            self.pdf_generator.page_settings_manager.configure_printer(printer)
             printer.setOrientation(QPrinter.Portrait)
             
             # Show print dialog
@@ -504,13 +532,10 @@ class PayslipPrintManager:
                 try:
                     # Set up the document for printing
                     doc = QTextDocument()
-                    font = QFont("Courier New", 10)
-                    doc.setDefaultFont(font)
                     doc.setPlainText(payslip["content"])
                     
-                    # Apply padding from page settings
-                    padding = self.pdf_generator.page_settings.get("padding", 0)
-                    doc.setDocumentMargin(padding)
+                    # Configure document through page settings manager
+                    self.pdf_generator.page_settings_manager.configure_document(doc)
                     
                     # Print the document
                     doc.print_(printer)
@@ -544,77 +569,30 @@ class PayslipPrintManager:
         return self.pdf_generator.output_directory
 
 
-# Common function to apply page settings to printer
-def apply_page_settings_to_printer(printer, page_settings):
-    """
-    Apply page settings from config to a printer instance
-    
-    Args:
-        printer: QPrinter instance to configure
-        page_settings: Dictionary containing paper size, margins, and padding settings
-    """
-    # Apply paper size
-    if page_settings.get("custom_size"):
-        custom_size = page_settings["custom_size"]
-        printer.setPaperSize(custom_size, QPrinter.Millimeter)
-    else:
-        printer.setPaperSize(page_settings.get("paper_size", QPrinter.B4))
-    
-    # Apply margins with numeric defaults
-    margins = page_settings.get("margins", {"top": 0, "bottom": 0, "left": 0, "right": 0})
-    
-    # Convert any "auto" or non-numeric values to 0
-    margin_left = float(margins["left"]) if isinstance(margins["left"], (int, float)) else 0
-    margin_top = float(margins["top"]) if isinstance(margins["top"], (int, float)) else 0
-    margin_right = float(margins["right"]) if isinstance(margins["right"], (int, float)) else 0
-    margin_bottom = float(margins["bottom"]) if isinstance(margins["bottom"], (int, float)) else 0
-    
-    printer.setPageMargins(margin_left, margin_top, margin_right, margin_bottom, QPrinter.Millimeter)
-
-
 # Common PDF generation function used by both single and bulk operations
-def generate_pdf(content, employee_name, output_directory, timestamp, page_settings):
-    """
-    Generate a PDF from payslip content with customizable page settings
-    
-    Args:
-        content: Payslip content to include in PDF
-        employee_name: Name of employee for filename generation
-        output_directory: Directory to save the PDF
-        timestamp: Timestamp to include in filename
-        page_settings: Dictionary containing paper size, margins, and padding settings
-    
-    Returns:
-        Path to generated PDF or None if generation failed
-    """
+def generate_pdf(content, employee_name, output_directory, timestamp):
+    """Generate a PDF from payslip content using singleton PageSettingsManager"""
     try:
-        # Clean the employee name for use in filename
+        settings_manager = PageSettingsManager()
+        
         safe_name = ''.join(c for c in employee_name if c.isalnum() or c in (' ', '-', '_')).strip()
         safe_name = safe_name.replace(' ', '_')
         
-        # Create filename
         filename = f"Payslip_{safe_name}_{timestamp}.pdf"
         pdf_path = os.path.join(output_directory, filename)
         
-        # Create a printer set to PDF output
         printer = QPrinter()
         printer.setOutputFormat(QPrinter.PdfFormat)
         printer.setOutputFileName(pdf_path)
+        printer.setFullPage(True)  # Enable full page printing
 
-        # Apply page settings using the common function
-        apply_page_settings_to_printer(printer, page_settings)
-        
-        # Create a text document with the content
+
         doc = QTextDocument()
-        font = QFont("Courier New", 10)  # Use monospaced font
-        doc.setDefaultFont(font)
         doc.setPlainText(content)
         
-        # Apply padding (if needed, adjust content layout)
-        padding = page_settings.get("padding", 0)
-        doc.setDocumentMargin(padding)
+        settings_manager.configure_printer(printer)
+        settings_manager.configure_document(doc)
         
-        # Generate the PDF directly
         doc.print_(printer)
         
         return pdf_path
