@@ -5,7 +5,7 @@ import logging
 import subprocess
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, QThread, QSizeF, Qt
-from PyQt5.QtWidgets import QMessageBox, QDialog, QProgressBar, QLabel, QVBoxLayout, QPushButton, QHBoxLayout, QFileDialog, QApplication, QProgressDialog
+from PyQt5.QtWidgets import QMessageBox, QDialog, QProgressBar, QLabel, QVBoxLayout, QPushButton, QHBoxLayout, QFileDialog, QApplication, QProgressDialog, QCheckBox
 from PyQt5.QtPrintSupport import QPrinter, QPrintDialog, QPrintPreviewDialog
 from PyQt5.QtGui import QTextDocument, QFont
 import uuid
@@ -385,44 +385,64 @@ class PayslipPDFGenerator:
             self.progress_dialog.cancel_button.clicked.connect(self._cancel_generation)
             self.progress_dialog.show()
             
-            # Initialize batch processor
+            # Ask user for batch processing mode
+            confirm_msg = QMessageBox(self.parent)
+            confirm_msg.setWindowTitle("Batch Processing Mode")
+            confirm_msg.setText("Select processing mode for bulk PDF generation:")
+            auto_checkbox = QCheckBox("Process all batches automatically without confirmation")
+            confirm_msg.setCheckBox(auto_checkbox)
+            confirm_msg.addButton("Continue", QMessageBox.AcceptRole)
+            confirm_msg.exec_()
+            ask_each_batch = not auto_checkbox.isChecked()
+            
+            # Initialize batch processing manually
             batch_processor = BatchProcessor(batch_size=10)
+            total_items = len(valid_employees)
+            processed = 0
+            success_count = 0
+            error_count = 0
             
             def process_batch(batch):
                 batch_success = 0
                 batch_errors = 0
-                
                 for employee in batch:
                     if self.cancelled:
                         break
-                        
                     try:
                         emp_name = employee.get('name', 'Employee')
                         payslip_content = content_generator(employee)
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-                        
                         pdf_path = generate_pdf(payslip_content, emp_name, output_dir, timestamp)
-                        
                         if pdf_path:
                             batch_success += 1
                             self.progress_dialog.update_current_job(True, f"Generated PDF for {emp_name}")
                         else:
                             batch_errors += 1
                             self.progress_dialog.update_current_job(False, f"Failed to generate PDF for {emp_name}")
-                            
                     except Exception as e:
                         batch_errors += 1
                         logger.error(f"Error processing {emp_name}: {str(e)}")
                         self.progress_dialog.update_current_job(False, f"Error: {str(e)}")
-                    
                 return batch_success, batch_errors
             
-            # Process batches
-            success_count, error_count = batch_processor.process_batches(
-                valid_employees,
-                process_batch,
-                lambda progress: self.progress_dialog.update_progress(progress)
-            )
+            # Process batches with confirmation if needed
+            for i in range(0, total_items, batch_processor.batch_size):
+                if ask_each_batch and i > 0:
+                    reply = QMessageBox.question(
+                        self.parent, "Continue?",
+                        "Process next batch?",
+                        QMessageBox.Yes | QMessageBox.No,
+                        QMessageBox.Yes
+                    )
+                    if reply != QMessageBox.Yes:
+                        break
+                batch = valid_employees[i:i + batch_processor.batch_size]
+                batch_success, batch_errors = process_batch(batch)
+                success_count += batch_success
+                error_count += batch_errors
+                processed += len(batch)
+                progress = int((processed / total_items) * 100)
+                self.progress_dialog.update_progress(progress)
             
             self._on_generation_finished(success_count, error_count, output_dir)
             
@@ -584,6 +604,58 @@ class BatchProcessor:
         return success_count, error_count
 
 
+class PrintWorker(QThread):
+    """Worker thread for batch printing"""
+    progress_updated = pyqtSignal(int)
+    job_updated = pyqtSignal(str)
+    finished = pyqtSignal(int, int)  # success_count, error_count
+    
+    def __init__(self, printer, employees, content_generator, page_settings_manager, batch_size=10):
+        super().__init__()
+        self.printer = printer
+        self.employees = employees
+        self.content_generator = content_generator
+        self.page_settings_manager = page_settings_manager
+        self.batch_size = batch_size
+        self.cancelled = False
+        
+    def run(self):
+        success_count = 0
+        error_count = 0
+        total = len(self.employees)
+        
+        for i, employee in enumerate(self.employees):
+            if self.cancelled:
+                break
+                
+            try:
+                emp_name = employee.get('name', 'Employee')
+                self.job_updated.emit(f"Printing payslip for {emp_name}...")
+                
+                payslip_content = self.content_generator(employee)
+                doc = QTextDocument()
+                doc.setPlainText(payslip_content)
+                self.page_settings_manager.configure_document(doc)
+                
+                doc.print_(self.printer)
+                success_count += 1
+                
+            except Exception as e:
+                error_count += 1
+                logger.error(f"Error printing for {emp_name}: {str(e)}")
+            
+            progress = int((i + 1) / total * 100)
+            self.progress_updated.emit(progress)
+            
+            # Memory cleanup
+            if (i + 1) % self.batch_size == 0:
+                QApplication.processEvents()
+                
+        self.finished.emit(success_count, error_count)
+    
+    def cancel(self):
+        self.cancelled = True
+
 class PayslipPrintManager:
     """Enhanced print manager that handles both printing and PDF generation for B4 paper size"""
     
@@ -675,55 +747,43 @@ class PayslipPrintManager:
                 logger.info("Print cancelled by user")
                 return False
 
-            progress = QProgressDialog("Printing payslips...", "Cancel", 0, len(employees), self.parent)
+            # Create progress dialog
+            progress = QProgressDialog(self.parent)
+            progress.setWindowTitle("Printing Payslips")
+            progress.setLabelText("Initializing...")
+            progress.setRange(0, 100)
             progress.setWindowModality(Qt.WindowModal)
+            progress.setAutoClose(False)
             
-            batch_processor = BatchProcessor(batch_size=10)
-            
-            def process_print_batch(batch):
-                batch_success = 0
-                batch_errors = 0
-                
-                for employee in batch:
-                    if progress.wasCanceled():
-                        return batch_success, batch_errors
-                        
-                    try:
-                        emp_name = employee.get('name', 'Employee')
-                        payslip_content = content_generator(employee)
-                        
-                        doc = QTextDocument()
-                        doc.setPlainText(payslip_content)
-                        self.pdf_generator.page_settings_manager.configure_document(doc)
-                        doc.print_(printer)
-                        
-                        batch_success += 1
-                        logger.info(f"Printed payslip for {emp_name}")
-                        
-                    except Exception as e:
-                        batch_errors += 1
-                        logger.error(f"Error printing payslip for {emp_name}: {str(e)}")
-                    
-                    QApplication.processEvents()
-                
-                return batch_success, batch_errors
-            
-            success_count, error_count = batch_processor.process_batches(
+            # Create worker thread
+            self.print_worker = PrintWorker(
+                printer,
                 employees,
-                process_print_batch,
-                lambda p: progress.setValue(p * len(employees) // 100)
+                content_generator,
+                self.pdf_generator.page_settings_manager
             )
             
-            progress.close()
+            # Connect signals
+            self.print_worker.progress_updated.connect(progress.setValue)
+            self.print_worker.job_updated.connect(progress.setLabelText)
+            progress.canceled.connect(self.print_worker.cancel)
             
-            message = (
-                f"Printing completed.\n"
-                f"Successfully printed: {success_count}\n"
-                f"Failed: {error_count}"
-            )
-            QMessageBox.information(self.parent, "Print Complete", message)
+            def on_finished(success_count, error_count):
+                progress.close()
+                message = (
+                    f"Printing completed.\n"
+                    f"Successfully printed: {success_count}\n"
+                    f"Failed: {error_count}"
+                )
+                QMessageBox.information(self.parent, "Print Complete", message)
             
-            return success_count > 0
+            self.print_worker.finished.connect(on_finished)
+            
+            # Start processing
+            self.print_worker.start()
+            progress.exec_()
+            
+            return True
             
         except Exception as e:
             logger.error(f"Error in bulk printing: {str(e)}")
