@@ -323,8 +323,64 @@ class PayslipPDFGenerator:
         if self.progress_dialog:
             self.progress_dialog.current_job.setText("Cancelling...")
 
+    def _generate_combined_pdf(self, employees, content_generator, output_dir):
+        """Generate a single PDF containing all payslips with page breaks"""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"Combined_Payslips_{timestamp}.pdf"
+            pdf_path = os.path.join(output_dir, filename)
+            
+            printer = QPrinter()
+            printer.setOutputFormat(QPrinter.PdfFormat)
+            printer.setOutputFileName(pdf_path)
+            printer.setFullPage(True)
+            
+            # Configure printer settings
+            self.page_settings_manager.configure_printer(printer)
+            
+            # Create document for all payslips
+            combined_doc = QTextDocument()
+            self.page_settings_manager.configure_document(combined_doc)
+            
+            total_content = []
+            for i, employee in enumerate(employees):
+                if self.cancelled:
+                    break
+                    
+                try:
+                    emp_name = employee.get('name', f'Employee {i+1}')
+                    content = content_generator(employee)
+                    
+                    # Add page break before content (except for first page)
+                    if i > 0:
+                        total_content.append('\f')  # Form feed character for page break
+                    
+                    total_content.append(content)
+                    
+                    progress = int((i + 1) / len(employees) * 100)
+                    if self.progress_dialog:
+                        self.progress_dialog.update_progress(progress)
+                        self.progress_dialog.update_current_job(True, f"Processing {emp_name}")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing {emp_name}: {str(e)}")
+                    if self.progress_dialog:
+                        self.progress_dialog.update_current_job(False, f"Error processing {emp_name}")
+            
+            # Set combined content
+            combined_doc.setPlainText('\n'.join(total_content))
+            
+            # Print to PDF
+            combined_doc.print_(printer)
+            
+            return pdf_path, len(employees)
+            
+        except Exception as e:
+            logger.error(f"Error generating combined PDF: {str(e)}")
+            return None, 0
+
     def generate_bulk_pdfs(self, employees, content_generator, ask_directory=True):
-        """Generate multiple payslip PDFs with batch processing"""
+        """Generate payslip PDFs with option for combined or separate files"""
         if not employees:
             QMessageBox.warning(self.parent, "No Data", "No employees selected for PDF generation.")
             return
@@ -338,70 +394,82 @@ class PayslipPDFGenerator:
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
             
+            # Ask user for PDF generation mode
+            mode_msg = QMessageBox()
+            mode_msg.setWindowTitle("PDF Generation Mode")
+            mode_msg.setText("How would you like to generate the PDFs?")
+            combined_btn = mode_msg.addButton("Combined PDF", QMessageBox.ActionRole)
+            separate_btn = mode_msg.addButton("Separate PDFs", QMessageBox.ActionRole)
+            cancel_btn = mode_msg.addButton(QMessageBox.Cancel)
+            
+            mode_msg.exec_()
+            
+            if mode_msg.clickedButton() == cancel_btn:
+                return
+            
             # Create progress dialog
             self.progress_dialog = PDFProgressDialog(self.parent, len(employees))
             self.progress_dialog.cancel_button.clicked.connect(self._cancel_generation)
             self.progress_dialog.show()
             
-            # Ask user for batch processing mode
-            confirm_msg = QMessageBox(self.parent)
-            confirm_msg.setWindowTitle("Batch Processing Mode")
-            confirm_msg.setText("Select processing mode for bulk PDF generation:")
-            auto_checkbox = QCheckBox("Process all batches automatically without confirmation")
-            confirm_msg.setCheckBox(auto_checkbox)
-            confirm_msg.addButton("Continue", QMessageBox.AcceptRole)
-            confirm_msg.exec_()
-            ask_each_batch = not auto_checkbox.isChecked()
-            
-            # Process in batches
-            batch_size = 10
-            total_items = len(employees)
-            processed = 0
-            success_count = 0
-            error_count = 0
-            
-            for i in range(0, total_items, batch_size):
-                if ask_each_batch and i > 0:
-                    reply = QMessageBox.question(
-                        self.parent, "Continue?",
-                        "Process next batch?",
-                        QMessageBox.Yes | QMessageBox.No,
-                        QMessageBox.Yes
-                    )
-                    if reply != QMessageBox.Yes:
-                        break
+            if mode_msg.clickedButton() == combined_btn:
+                # Generate combined PDF
+                pdf_path, processed_count = self._generate_combined_pdf(employees, content_generator, output_dir)
+                if pdf_path:
+                    self._on_generation_finished(processed_count, 0, output_dir)
+                else:
+                    self._on_generation_finished(0, len(employees), output_dir)
+            else:
+                # Generate separate PDFs (existing functionality)
+                self.cancelled = False
+                success_count = 0
+                error_count = 0
+                total = len(employees)
                 
-                batch = employees[i:i + batch_size]
-                for employee in batch:
+                for i, employee in enumerate(employees):
                     if self.cancelled:
                         break
+                        
                     try:
-                        emp_name = employee.get('name', 'Employee')
-                        payslip_content = content_generator(employee)
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-                        pdf_path = generate_pdf(payslip_content, emp_name, output_dir, timestamp)
+                        # Generate payslip content on demand
+                        emp_name = employee.get('name', f"Employee {i+1}")
+                        
+                        # Get the payslip content from the generator function
+                        try:
+                            payslip_content = content_generator(employee)
+                        except Exception as e:
+                            logger.error(f"Error generating payslip for {emp_name}: {str(e)}")
+                            error_count += 1
+                            self.single_pdf_complete.emit(False, f"Failed to generate payslip for {emp_name}")
+                            continue
+                        
+                        # Generate PDF using the common generator function
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
+                        pdf_path = generate_pdf(payslip_content, emp_name, output_dir, 
+                                              timestamp)
                         if pdf_path:
                             success_count += 1
-                            self.progress_dialog.update_current_job(True, f"Generated PDF for {emp_name}")
+                            self.single_pdf_complete.emit(True, f"Generated PDF for {emp_name} at {pdf_path}")
                         else:
                             error_count += 1
-                            self.progress_dialog.update_current_job(False, f"Failed to generate PDF for {emp_name}")
+                            self.single_pdf_complete.emit(False, f"Failed to generate PDF for {emp_name}")
+                        
                     except Exception as e:
+                        logger.error(f"Error generating PDF: {str(e)}")
                         error_count += 1
-                        logger.error(f"Error processing {emp_name}: {str(e)}")
-                        self.progress_dialog.update_current_job(False, f"Error: {str(e)}")
+                        self.single_pdf_complete.emit(False, f"Error: {str(e)}")
+                    
+                    # Update progress
+                    progress = int((i + 1) / total * 100)
+                    self.progress_dialog.update_progress(progress)
                 
-                processed += len(batch)
-                progress = int((processed / total_items) * 100)
-                self.progress_dialog.update_progress(progress)
-            
-            self._on_generation_finished(success_count, error_count, output_dir)
-            
+                self._on_generation_finished(success_count, error_count, output_dir)
+
         except Exception as e:
-            logger.error(f"Error in batch PDF generation: {str(e)}")
+            logger.error(f"Error in PDF generation: {str(e)}")
             if self.progress_dialog:
                 self.progress_dialog.close()
-            QMessageBox.critical(self.parent, "PDF Error", f"Error in batch processing: {str(e)}")
+            QMessageBox.critical(self.parent, "PDF Error", f"Error in PDF generation: {str(e)}")
 
     def _on_generation_finished(self, success_count, error_count, output_directory):
         """Handle completion of PDF generation"""
