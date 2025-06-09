@@ -732,6 +732,29 @@ class PayslipPrintManager:
         """Set the output directory on the PDF generator"""
         self.pdf_generator.output_directory = value
 
+    def _validate_printer(self, printer_name):
+        """Validate if the selected printer exists and is ready"""
+        try:
+            available_printers = QPrinterInfo.availablePrinters()
+            selected_printer = next((p for p in available_printers if p.printerName() == printer_name), None)
+            
+            if not selected_printer:
+                logger.error(f"Selected printer '{printer_name}' not found")
+                QMessageBox.critical(self.parent, "Printer Error", f"Selected printer '{printer_name}' not found")
+                return False
+                
+            if not selected_printer.isValid():
+                logger.error(f"Selected printer '{printer_name}' is not valid")
+                QMessageBox.critical(self.parent, "Printer Error", f"Selected printer '{printer_name}' is not valid")
+                return False
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error validating printer: {str(e)}")
+            QMessageBox.critical(self.parent, "Printer Error", f"Error validating printer: {str(e)}")
+            return False
+
     def _print_payslips(self, payslips, title="Print Payslips", direct_print=False, printer_name=None):
         """Internal method for handling payslip printing"""
         try:
@@ -742,6 +765,8 @@ class PayslipPrintManager:
 
             if direct_print:
                 if printer_name:
+                    if not self._validate_printer(printer_name):
+                        return False
                     printer.setPrinterName(printer_name)
                 if not printer.printerName():
                     logger.error("No printer selected for direct printing")
@@ -753,13 +778,19 @@ class PayslipPrintManager:
                     logger.info("Print cancelled by user")
                     return False
 
+            # Directly proceed with printing
             success = True
             for payslip in payslips:
                 try:
+                    if not payslip.get("content"):
+                        logger.error(f"Empty payslip content for {payslip.get('name', 'Unknown')}")
+                        continue
+                        
                     doc = QTextDocument()
                     doc.setPlainText(payslip["content"])
                     self.pdf_generator.page_settings_manager.configure_document(doc)
                     doc.print_(printer)
+                    
                 except Exception as e:
                     logger.error(f"Error printing payslip for {payslip['name']}: {str(e)}")
                     success = False
