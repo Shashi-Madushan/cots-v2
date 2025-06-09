@@ -673,6 +673,38 @@ class PayslipPrintManager:
         """Set the output directory on the PDF generator"""
         self.pdf_generator.output_directory = value
 
+    def _print_payslips(self, payslips, title="Print Payslips"):
+        """Internal method for handling payslip printing"""
+        try:
+            printer = QPrinter()
+            printer.setFullPage(True)
+            self.pdf_generator.page_settings_manager.configure_printer(printer)
+            printer.setOrientation(QPrinter.Portrait)
+
+            print_dialog = QPrintDialog(printer, self.parent)
+            print_dialog.setWindowTitle(title)
+            
+            if print_dialog.exec_() != QPrintDialog.Accepted:
+                logger.info("Print cancelled by user")
+                return False
+
+            success = True
+            for payslip in payslips:
+                try:
+                    doc = QTextDocument()
+                    doc.setPlainText(payslip["content"])
+                    self.pdf_generator.page_settings_manager.configure_document(doc)
+                    doc.print_(printer)
+                except Exception as e:
+                    logger.error(f"Error printing payslip for {payslip['name']}: {str(e)}")
+                    success = False
+
+            return success
+
+        except Exception as e:
+            logger.error(f"Error in print function: {str(e)}")
+            return False
+
     def print_single_payslip(self, payslip_content, employee_name="Employee"):
         """Print a single payslip directly to printer with appropriate page settings"""
         return self._print_payslips([{"content": payslip_content, "name": employee_name}], 
