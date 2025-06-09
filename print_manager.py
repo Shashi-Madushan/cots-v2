@@ -421,6 +421,49 @@ class PayslipPDFGenerator:
             logger.error(f"Error showing completion message: {str(e)}")
 
 
+class PrinterSelectionDialog(QDialog):
+    """Dialog for selecting a printer from available printers"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Printer")
+        self.setMinimumWidth(300)
+        
+        # Create layout
+        layout = QVBoxLayout()
+        
+        # Printer selection combo box
+        self.printer_combo = QComboBox()
+        self.printer_combo.addItems([p.printerName() for p in QPrinterInfo.availablePrinters()])
+        
+        # Set default printer if available
+        default_printer = QPrinterInfo.defaultPrinter()
+        if default_printer:
+            index = self.printer_combo.findText(default_printer.printerName())
+            if index >= 0:
+                self.printer_combo.setCurrentIndex(index)
+        
+        layout.addWidget(QLabel("Select Printer:"))
+        layout.addWidget(self.printer_combo)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        ok_button = QPushButton("OK")
+        cancel_button = QPushButton("Cancel")
+        
+        ok_button.clicked.connect(self.accept)
+        cancel_button.clicked.connect(self.reject)
+        
+        button_layout.addWidget(ok_button)
+        button_layout.addWidget(cancel_button)
+        layout.addLayout(button_layout)
+        
+        self.setLayout(layout)
+    
+    def selected_printer(self):
+        """Return the name of the selected printer"""
+        return self.printer_combo.currentText()
+
+
 class PayslipPrintManager:
     """Enhanced print manager that handles both printing and PDF generation for B4 paper size"""
     
