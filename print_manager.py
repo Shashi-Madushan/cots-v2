@@ -5,8 +5,8 @@ import logging
 import subprocess
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, QThread, QSizeF, Qt
-from PyQt5.QtWidgets import QMessageBox, QDialog, QProgressBar, QLabel, QVBoxLayout, QPushButton, QHBoxLayout, QFileDialog, QApplication, QProgressDialog, QCheckBox
-from PyQt5.QtPrintSupport import QPrinter, QPrintDialog, QPrintPreviewDialog
+from PyQt5.QtWidgets import QMessageBox, QDialog, QProgressBar, QLabel, QVBoxLayout, QPushButton, QHBoxLayout, QFileDialog, QApplication, QProgressDialog, QCheckBox, QComboBox
+from PyQt5.QtPrintSupport import QPrinter, QPrintDialog, QPrintPreviewDialog, QPrinterInfo
 from PyQt5.QtGui import QTextDocument, QFont
 import uuid
 import math
@@ -204,7 +204,8 @@ class PageSettingsManager:
         )
         printer.setOrientation(self._settings.get("orientation", QPrinter.Portrait))
         printer.setFullPage(True)  # Enable full page printing
-
+        printer.setFromTo(0, 0)  # This tricks the printer into not showing page numbers
+        printer.setPrintRange(QPrinter.AllPages)
     def configure_document(self, doc):
         """Configure document settings"""
         font = QFont(
@@ -656,6 +657,64 @@ class PrintWorker(QThread):
     def cancel(self):
         self.cancelled = True
 
+class PrinterSelectionDialog(QDialog):
+    """Dialog for selecting a printer from available printers"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Printer")
+        self.setMinimumWidth(300)
+        
+        layout = QVBoxLayout()
+        
+        # Add printer label
+        printer_label = QLabel("Available Printers:")
+        layout.addWidget(printer_label)
+        
+        # Printer list
+        self.printer_list = QComboBox()
+        self.refresh_printers()
+        layout.addWidget(self.printer_list)
+        
+        # Buttons
+        button_layout = QHBoxLayout()
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.clicked.connect(self.refresh_printers)
+        button_layout.addWidget(refresh_btn)
+        
+        ok_btn = QPushButton("OK")
+        ok_btn.clicked.connect(self.accept)
+        button_layout.addWidget(ok_btn)
+        
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_btn)
+        
+        layout.addLayout(button_layout)
+        self.setLayout(layout)
+    
+    def refresh_printers(self):
+        """Refresh the list of available printers"""
+        self.printer_list.clear()
+        available_printers = QPrinterInfo.availablePrinters()
+        
+        # Add default printer first if it exists
+        default_printer = QPrinterInfo.defaultPrinter()
+        if default_printer:
+            self.printer_list.addItem(default_printer.printerName())
+            
+        # Add other printers
+        for printer in available_printers:
+            if printer.printerName() != default_printer.printerName():
+                self.printer_list.addItem(printer.printerName())
+                
+        if self.printer_list.count() == 0:
+            self.printer_list.addItem("No printers found")
+    
+    def selected_printer(self):
+        """Get the selected printer name"""
+        text = self.printer_list.currentText()
+        return text if text != "No printers found" else None
+
 class PayslipPrintManager:
     """Enhanced print manager that handles both printing and PDF generation for B4 paper size"""
     
@@ -673,7 +732,7 @@ class PayslipPrintManager:
         """Set the output directory on the PDF generator"""
         self.pdf_generator.output_directory = value
 
-    def _print_payslips(self, payslips, title="Print Payslips"):
+    def _print_payslips(self, payslips, title="Print Payslips", direct_print=False, printer_name=None):
         """Internal method for handling payslip printing"""
         try:
             printer = QPrinter()
@@ -681,12 +740,18 @@ class PayslipPrintManager:
             self.pdf_generator.page_settings_manager.configure_printer(printer)
             printer.setOrientation(QPrinter.Portrait)
 
-            print_dialog = QPrintDialog(printer, self.parent)
-            print_dialog.setWindowTitle(title)
-            
-            if print_dialog.exec_() != QPrintDialog.Accepted:
-                logger.info("Print cancelled by user")
-                return False
+            if direct_print:
+                if printer_name:
+                    printer.setPrinterName(printer_name)
+                if not printer.printerName():
+                    logger.error("No printer selected for direct printing")
+                    return False
+            else:
+                print_dialog = QPrintDialog(printer, self.parent)
+                print_dialog.setWindowTitle(title)
+                if print_dialog.exec_() != QPrintDialog.Accepted:
+                    logger.info("Print cancelled by user")
+                    return False
 
             success = True
             for payslip in payslips:
@@ -705,10 +770,27 @@ class PayslipPrintManager:
             logger.error(f"Error in print function: {str(e)}")
             return False
 
-    def print_single_payslip(self, payslip_content, employee_name="Employee"):
-        """Print a single payslip directly to printer with appropriate page settings"""
-        return self._print_payslips([{"content": payslip_content, "name": employee_name}], 
-                                   title="Print Payslip")
+    def get_printer_selection(self):
+        """Show printer selection dialog and return selected printer name"""
+        dialog = PrinterSelectionDialog(self.parent)
+        if dialog.exec_() == QDialog.Accepted:
+            return dialog.selected_printer()
+        return None
+
+    def print_single_payslip(self, payslip_content, employee_name="Employee", show_printer_dialog=True):
+        """Print a single payslip with optional printer selection"""
+        printer_name = None
+        if show_printer_dialog:
+            printer_name = self.get_printer_selection()
+            if not printer_name:
+                return False
+        
+        return self._print_payslips(
+            [{"content": payslip_content, "name": employee_name}],
+            title="Print Payslip",
+            direct_print=bool(printer_name),
+            printer_name=printer_name
+        )
     
     def print_with_preview(self, payslip_content, employee_name="Employee"):
         """Show print preview dialog before printing with appropriate page settings"""
@@ -760,67 +842,24 @@ class PayslipPrintManager:
         """Generate bulk PDFs - delegate to PDF generator"""
         return self.pdf_generator.generate_bulk_pdfs(employees, content_generator, ask_directory)
     
-    def print_bulk_payslips(self, employees, content_generator):
-        """Print multiple payslips with improved batch processing"""
+    def print_bulk_payslips(self, employees, content_generator, show_printer_dialog=True):
+        """Print multiple payslips with printer selection"""
         if not employees:
             QMessageBox.warning(self.parent, "No Data", "No employees selected for printing.")
             return False
 
-        try:
-            printer = QPrinter()
-            printer.setFullPage(True)
-            self.pdf_generator.page_settings_manager.configure_printer(printer)
-            printer.setOrientation(QPrinter.Portrait)
-
-            print_dialog = QPrintDialog(printer, self.parent)
-            print_dialog.setWindowTitle("Print Payslips")
-            
-            if print_dialog.exec_() != QPrintDialog.Accepted:
-                logger.info("Print cancelled by user")
+        printer_name = None
+        if show_printer_dialog:
+            printer_name = self.get_printer_selection()
+            if not printer_name:
                 return False
 
-            # Create progress dialog
-            progress = QProgressDialog(self.parent)
-            progress.setWindowTitle("Printing Payslips")
-            progress.setLabelText("Initializing...")
-            progress.setRange(0, 100)
-            progress.setWindowModality(Qt.WindowModal)
-            progress.setAutoClose(False)
-            
-            # Create worker thread
-            self.print_worker = PrintWorker(
-                printer,
-                employees,
-                content_generator,
-                self.pdf_generator.page_settings_manager
-            )
-            
-            # Connect signals
-            self.print_worker.progress_updated.connect(progress.setValue)
-            self.print_worker.job_updated.connect(progress.setLabelText)
-            progress.canceled.connect(self.print_worker.cancel)
-            
-            def on_finished(success_count, error_count):
-                progress.close()
-                message = (
-                    f"Printing completed.\n"
-                    f"Successfully printed: {success_count}\n"
-                    f"Failed: {error_count}"
-                )
-                QMessageBox.information(self.parent, "Print Complete", message)
-            
-            self.print_worker.finished.connect(on_finished)
-            
-            # Start processing
-            self.print_worker.start()
-            progress.exec_()
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error in bulk printing: {str(e)}")
-            QMessageBox.critical(self.parent, "Print Error", f"Error in printing: {str(e)}")
-            return False
+        return self._print_payslips_bulk(
+            employees,
+            content_generator,
+            direct_print=bool(printer_name),
+            printer_name=printer_name
+        )
 
 # For backwards compatibility, keep the original class name as an alias
 PayslipPrinter = PayslipPDFGenerator
