@@ -239,6 +239,15 @@ class PageSettingsManager:
         """Get current settings"""
         return self._settings.copy()
 
+    def get_page_height(self, printer):
+        """Get the page height in pixels"""
+        try:
+            rect = printer.pageRect()
+            return rect.height()
+        except Exception as e:
+            logger.error(f"Error getting page height: {str(e)}")
+            return 1000  # Default fallback height
+
 
 class PayslipPDFGenerator:
     """Main class for handling payslip PDF generation"""
@@ -733,7 +742,7 @@ class PayslipPrintManager:
         self.pdf_generator.output_directory = value
 
     def _validate_printer(self, printer_name):
-        """Validate if the selected printer exists and is ready"""
+        """Validate if the selected printer exists"""
         try:
             available_printers = QPrinterInfo.availablePrinters()
             selected_printer = next((p for p in available_printers if p.printerName() == printer_name), None)
@@ -743,17 +752,39 @@ class PayslipPrintManager:
                 QMessageBox.critical(self.parent, "Printer Error", f"Selected printer '{printer_name}' not found")
                 return False
                 
-            if not selected_printer.isValid():
-                logger.error(f"Selected printer '{printer_name}' is not valid")
-                QMessageBox.critical(self.parent, "Printer Error", f"Selected printer '{printer_name}' is not valid")
-                return False
-                
             return True
             
         except Exception as e:
             logger.error(f"Error validating printer: {str(e)}")
             QMessageBox.critical(self.parent, "Printer Error", f"Error validating printer: {str(e)}")
             return False
+
+    def _add_page_breaks(self, content, page_height):
+        """Add page breaks based on content height and page height"""
+        lines = content.split('\n')
+        pages = []
+        current_page = []
+        current_height = 0
+        line_height = 20  # Approximate height per line in pixels
+        
+        for line in lines:
+            line_height_estimate = len(line) // 80 + 1  # Adjust line height for wrapped lines
+            estimated_height = line_height * line_height_estimate
+            
+            if current_height + estimated_height > page_height:
+                # Add current page and start new page
+                pages.append('\n'.join(current_page))
+                current_page = [line]
+                current_height = estimated_height
+            else:
+                current_page.append(line)
+                current_height += estimated_height
+        
+        # Add last page
+        if current_page:
+            pages.append('\n'.join(current_page))
+            
+        return pages
 
     def _print_payslips(self, payslips, title="Print Payslips", direct_print=False, printer_name=None):
         """Internal method for handling payslip printing"""
@@ -778,18 +809,27 @@ class PayslipPrintManager:
                     logger.info("Print cancelled by user")
                     return False
 
-            # Directly proceed with printing
+            page_height = self.pdf_generator.page_settings_manager.get_page_height(printer)
             success = True
+            
             for payslip in payslips:
                 try:
                     if not payslip.get("content"):
                         logger.error(f"Empty payslip content for {payslip.get('name', 'Unknown')}")
                         continue
+                    
+                    # Split content into pages
+                    content_pages = self._add_page_breaks(payslip["content"], page_height)
+                    
+                    for i, page_content in enumerate(content_pages):
+                        doc = QTextDocument()
+                        doc.setPlainText(page_content)
+                        self.pdf_generator.page_settings_manager.configure_document(doc)
                         
-                    doc = QTextDocument()
-                    doc.setPlainText(payslip["content"])
-                    self.pdf_generator.page_settings_manager.configure_document(doc)
-                    doc.print_(printer)
+                        if i > 0:  # If not first page, start new page
+                            printer.newPage()
+                        
+                        doc.print_(printer)
                     
                 except Exception as e:
                     logger.error(f"Error printing payslip for {payslip['name']}: {str(e)}")
@@ -799,6 +839,65 @@ class PayslipPrintManager:
 
         except Exception as e:
             logger.error(f"Error in print function: {str(e)}")
+            return False
+
+    def _print_payslips_bulk(self, employees, content_generator, direct_print=False, printer_name=None):
+        """Internal method for handling bulk payslip printing"""
+        try:
+            printer = QPrinter()
+            printer.setFullPage(True)
+            self.pdf_generator.page_settings_manager.configure_printer(printer)
+            printer.setOrientation(QPrinter.Portrait)
+
+            if direct_print:
+                if printer_name:
+                    if not self._validate_printer(printer_name):
+                        return False
+                    printer.setPrinterName(printer_name)
+                if not printer.printerName():
+                    logger.error("No printer selected for direct printing")
+                    return False
+            else:
+                print_dialog = QPrintDialog(printer, self.parent)
+                print_dialog.setWindowTitle("Print Payslips")
+                if print_dialog.exec_() != QPrintDialog.Accepted:
+                    logger.info("Print cancelled by user")
+                    return False
+
+            page_height = self.pdf_generator.page_settings_manager.get_page_height(printer)
+            success = True
+            
+            for employee in employees:
+                try:
+                    emp_name = employee.get('name', 'Employee')
+                    self.job_updated.emit(f"Printing payslip for {emp_name}...")
+                    
+                    payslip_content = content_generator(employee)
+                    doc = QTextDocument()
+                    doc.setPlainText(payslip_content)
+                    self.pdf_generator.page_settings_manager.configure_document(doc)
+                    
+                    # Split content into pages
+                    content_pages = self._add_page_breaks(payslip_content, page_height)
+                    
+                    for i, page_content in enumerate(content_pages):
+                        doc = QTextDocument()
+                        doc.setPlainText(page_content)
+                        self.pdf_generator.page_settings_manager.configure_document(doc)
+                        
+                        if i > 0:  # If not first page, start new page
+                            printer.newPage()
+                        
+                        doc.print_(printer)
+                    
+                except Exception as e:
+                    error_count += 1
+                    logger.error(f"Error printing for {emp_name}: {str(e)}")
+            
+            return success
+
+        except Exception as e:
+            logger.error(f"Error in bulk print function: {str(e)}")
             return False
 
     def get_printer_selection(self):
