@@ -606,12 +606,11 @@ class PayslipPrintManager:
 
             page_height = self.pdf_generator.page_settings_manager.get_page_height(printer)
             success = True
+            error_count = 0  # Initialize error count
             
             for employee in employees:
                 try:
                     emp_name = employee.get('name', 'Employee')
-                    self.job_updated.emit(f"Printing payslip for {emp_name}...")
-                    
                     payslip_content = content_generator(employee)
                     doc = QTextDocument()
                     doc.setPlainText(payslip_content)
@@ -632,6 +631,7 @@ class PayslipPrintManager:
                     
                 except Exception as e:
                     error_count += 1
+                    success = False
                     logger.error(f"Error printing for {emp_name}: {str(e)}")
             
             return success
