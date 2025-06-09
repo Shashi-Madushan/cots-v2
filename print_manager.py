@@ -342,7 +342,8 @@ class PayslipPDFGenerator:
             combined_doc = QTextDocument()
             self.page_settings_manager.configure_document(combined_doc)
             
-            total_content = []
+            # Use HTML formatting to enforce page breaks
+            html_content = []
             for i, employee in enumerate(employees):
                 if self.cancelled:
                     break
@@ -351,11 +352,12 @@ class PayslipPDFGenerator:
                     emp_name = employee.get('name', f'Employee {i+1}')
                     content = content_generator(employee)
                     
-                    # Add page break before content (except for first page)
-                    if i > 0:
-                        total_content.append('\f')  # Form feed character for page break
-                    
-                    total_content.append(content)
+                    # Wrap each payslip in a div with page-break-after
+                    html_content.append(f'<div style="page-break-after: always;">')
+                    # Replace newlines with <br> and spaces with &nbsp; to preserve formatting
+                    formatted_content = content.replace('\n', '<br>').replace(' ', '&nbsp;')
+                    html_content.append(formatted_content)
+                    html_content.append('</div>')
                     
                     progress = int((i + 1) / len(employees) * 100)
                     if self.progress_dialog:
@@ -367,8 +369,8 @@ class PayslipPDFGenerator:
                     if self.progress_dialog:
                         self.progress_dialog.update_current_job(False, f"Error processing {emp_name}")
             
-            # Set combined content
-            combined_doc.setPlainText('\n'.join(total_content))
+            # Set combined content as HTML
+            combined_doc.setHtml(''.join(html_content))
             
             # Print to PDF
             combined_doc.print_(printer)
