@@ -648,19 +648,35 @@ class PayslipPrintManager:
         return None
 
     def print_single_payslip(self, payslip_content, employee_name="Employee", show_printer_dialog=True):
-        """Print a single payslip with optional printer selection"""
-        printer_name = None
-        if show_printer_dialog:
-            printer_name = self.get_printer_selection()
-            if not printer_name:
-                return False
-        
-        return self._print_payslips(
-            [{"content": payslip_content, "name": employee_name}],
-            title="Print Payslip",
-            direct_print=bool(printer_name),
-            printer_name=printer_name
-        )
+        """Print a single payslip with printer selection"""
+        try:
+            printer = QPrinter()
+            printer.setFullPage(True)
+            self.pdf_generator.page_settings_manager.configure_printer(printer)
+            printer.setOrientation(QPrinter.Portrait)
+
+            if show_printer_dialog:
+                # Show printer selection dialog
+                dialog = PrinterSelectionDialog(self.parent)
+                if dialog.exec_() == QDialog.Accepted:
+                    printer_name = dialog.selected_printer()
+                    printer.setPrinterName(printer_name)
+                else:
+                    return False
+
+            # Create and configure document
+            doc = QTextDocument()
+            doc.setPlainText(payslip_content)
+            self.pdf_generator.page_settings_manager.configure_document(doc)
+
+            # Print directly
+            doc.print_(printer)
+            return True
+
+        except Exception as e:
+            logger.error(f"Error printing payslip: {str(e)}")
+            QMessageBox.critical(self.parent, "Print Error", f"Error printing payslip: {str(e)}")
+            return False
     
     def print_with_preview(self, payslip_content, employee_name="Employee"):
         """Show print preview dialog before printing with appropriate page settings"""
