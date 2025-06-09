@@ -16,35 +16,7 @@ logger = logging.getLogger('PrintManager')
 
 def is_printer_available():
     """Check if any printers are available on the system"""
-    # For PDF generation, we don't need an actual printer
     return True
-    # Original printer detection code commented out
-    '''
-    try:
-        printer = QPrinter()
-        # If default printer name is empty, there may be no printers
-        if not printer.printerName():
-            if platform.system() == 'Windows':
-                # On Windows, check for printers using wmic (requires admin)
-                import subprocess
-                result = subprocess.run(['wmic', 'printer', 'get', 'name'], 
-                                      capture_output=True, text=True, check=False)
-                # If any printers are listed after header line, return True
-                lines = [line.strip() for line in result.stdout.split('\n') if line.strip()]
-                return len(lines) > 1  # More than just the header
-            elif platform.system() == 'Darwin':  # macOS
-                result = subprocess.run(['lpstat', '-p'], 
-                                      capture_output=True, text=True, check=False)
-                return 'printer' in result.stdout.lower()
-            else:  # Linux and other UNIX
-                result = subprocess.run(['lpstat', '-p'], 
-                                      capture_output=True, text=True, check=False)
-                return result.returncode == 0 and result.stdout.strip() != ''
-        return True
-    except Exception as e:
-        logger.error(f"Error checking for printers: {str(e)}")
-        return False
-    '''
 
 class PDFGeneratorWorker(QThread):
     """Worker thread for generating payslip PDFs in the background"""
@@ -358,30 +330,6 @@ class PayslipPDFGenerator:
             return
 
         try:
-            # Data validation - filter out invalid entries
-            valid_employees = []
-            for emp in employees:
-                try:
-                    # Validate required fields
-                    if not emp or not isinstance(emp, dict):
-                        continue
-                    # Convert potential NaN values to None or default values
-                    cleaned_emp = {}
-                    for key, value in emp.items():
-                        if isinstance(value, float) and math.isnan(value):
-                            cleaned_emp[key] = None
-                        else:
-                            cleaned_emp[key] = value
-                    valid_employees.append(cleaned_emp)
-                except Exception as e:
-                    logger.warning(f"Skipping invalid employee data: {str(e)}")
-                    continue
-
-            if not valid_employees:
-                QMessageBox.warning(self.parent, "Invalid Data", 
-                                  "No valid employee data found for PDF generation.")
-                return
-
             # Get output directory
             output_dir = self.get_output_directory("Select Directory to Save PDF Payslips") if ask_directory else self.output_directory
             if not output_dir:
@@ -391,7 +339,7 @@ class PayslipPDFGenerator:
                 os.makedirs(output_dir)
             
             # Create progress dialog
-            self.progress_dialog = PDFProgressDialog(self.parent, len(valid_employees))
+            self.progress_dialog = PDFProgressDialog(self.parent, len(employees))
             self.progress_dialog.cancel_button.clicked.connect(self._cancel_generation)
             self.progress_dialog.show()
             
@@ -405,38 +353,14 @@ class PayslipPDFGenerator:
             confirm_msg.exec_()
             ask_each_batch = not auto_checkbox.isChecked()
             
-            # Initialize batch processing manually
-            batch_processor = BatchProcessor(batch_size=10)
-            total_items = len(valid_employees)
+            # Process in batches
+            batch_size = 10
+            total_items = len(employees)
             processed = 0
             success_count = 0
             error_count = 0
             
-            def process_batch(batch):
-                batch_success = 0
-                batch_errors = 0
-                for employee in batch:
-                    if self.cancelled:
-                        break
-                    try:
-                        emp_name = employee.get('name', 'Employee')
-                        payslip_content = content_generator(employee)
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-                        pdf_path = generate_pdf(payslip_content, emp_name, output_dir, timestamp)
-                        if pdf_path:
-                            batch_success += 1
-                            self.progress_dialog.update_current_job(True, f"Generated PDF for {emp_name}")
-                        else:
-                            batch_errors += 1
-                            self.progress_dialog.update_current_job(False, f"Failed to generate PDF for {emp_name}")
-                    except Exception as e:
-                        batch_errors += 1
-                        logger.error(f"Error processing {emp_name}: {str(e)}")
-                        self.progress_dialog.update_current_job(False, f"Error: {str(e)}")
-                return batch_success, batch_errors
-            
-            # Process batches with confirmation if needed
-            for i in range(0, total_items, batch_processor.batch_size):
+            for i in range(0, total_items, batch_size):
                 if ask_each_batch and i > 0:
                     reply = QMessageBox.question(
                         self.parent, "Continue?",
@@ -446,10 +370,27 @@ class PayslipPDFGenerator:
                     )
                     if reply != QMessageBox.Yes:
                         break
-                batch = valid_employees[i:i + batch_processor.batch_size]
-                batch_success, batch_errors = process_batch(batch)
-                success_count += batch_success
-                error_count += batch_errors
+                
+                batch = employees[i:i + batch_size]
+                for employee in batch:
+                    if self.cancelled:
+                        break
+                    try:
+                        emp_name = employee.get('name', 'Employee')
+                        payslip_content = content_generator(employee)
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+                        pdf_path = generate_pdf(payslip_content, emp_name, output_dir, timestamp)
+                        if pdf_path:
+                            success_count += 1
+                            self.progress_dialog.update_current_job(True, f"Generated PDF for {emp_name}")
+                        else:
+                            error_count += 1
+                            self.progress_dialog.update_current_job(False, f"Failed to generate PDF for {emp_name}")
+                    except Exception as e:
+                        error_count += 1
+                        logger.error(f"Error processing {emp_name}: {str(e)}")
+                        self.progress_dialog.update_current_job(False, f"Error: {str(e)}")
+                
                 processed += len(batch)
                 progress = int((processed / total_items) * 100)
                 self.progress_dialog.update_progress(progress)
@@ -479,250 +420,6 @@ class PayslipPDFGenerator:
         except Exception as e:
             logger.error(f"Error showing completion message: {str(e)}")
 
-    def generate_single_pdf_legacy(self, employee_name, payslip_content, ask_directory=True):
-        """
-        Generate a single payslip PDF (legacy method) - DEPRECATED
-        
-        Args:
-            employee_name: Name of the employee for the payslip
-            payslip_content: Content of the payslip
-            ask_directory: Whether to ask user for directory selection
-        """
-        try:
-            # Get output directory
-            if ask_directory:
-                output_dir = self.get_output_directory("Select Directory to Save PDF")
-                if not output_dir:  # User cancelled
-                    return False
-            else:
-                output_dir = self.output_directory
-            
-            # Ensure output directory exists
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
-            
-            # Use timestamp for filename
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            
-            # Generate PDF using the common generator function
-            pdf_path = generate_pdf(payslip_content, employee_name, output_dir, 
-                                  timestamp)
-            
-            if pdf_path:
-                # Update the output directory for status message
-                self.output_directory = output_dir
-                logger.info(f"PDF saved to: {pdf_path}")
-                return True
-            else:
-                return False
-            
-        except Exception as e:
-            logger.error(f"Error in PDF generation (legacy): {str(e)}")
-            QMessageBox.critical(self.parent, "PDF Error", f"Error generating PDF (legacy): {str(e)}")
-            return False
-
-    def generate_bulk_pdfs_legacy(self, employees, content_generator, ask_directory=True):
-        """Generate multiple payslip PDFs (legacy method) - DEPRECATED"""
-        if not employees:
-            QMessageBox.warning(self.parent, "No Data", "No employees selected for PDF generation.")
-            return
-        
-        try:
-            # Get output directory
-            output_dir = self.get_output_directory("Select Directory to Save PDF Payslips") if ask_directory else self.output_directory
-            if not output_dir:
-                return
-            
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
-            
-            # Create progress dialog
-            self.progress_dialog = PDFProgressDialog(self.parent, len(employees))
-            self.progress_dialog.cancel_button.clicked.connect(self._cancel_generation)
-            self.progress_dialog.show()
-            
-            # Process each employee sequentially (legacy method)
-            for i, employee in enumerate(employees):
-                if self.cancelled:
-                    break
-                
-                try:
-                    emp_name = employee.get('name', f"Employee {i+1}")
-                    payslip_content = content_generator(employee)
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-                    
-                    pdf_path = generate_pdf(payslip_content, emp_name, output_dir, timestamp)
-                    
-                    if pdf_path:
-                        self.progress_dialog.update_current_job(True, f"Generated PDF for {emp_name} at {pdf_path}")
-                    else:
-                        self.progress_dialog.update_current_job(False, f"Failed to generate PDF for {emp_name}")
-                
-                except Exception as e:
-                    logger.error(f"Error generating PDF for {emp_name}: {str(e)}")
-                    self.progress_dialog.update_current_job(False, f"Error: {str(e)}")
-                
-                # Update progress
-                progress = int((i + 1) / len(employees) * 100)
-                self.progress_dialog.update_progress(progress)
-            
-            self.process_finished.emit(len(employees), 0)
-            
-        except Exception as e:
-            logger.error(f"Error in bulk PDF generation (legacy): {str(e)}")
-            if self.progress_dialog:
-                self.progress_dialog.close()
-            QMessageBox.critical(self.parent, "PDF Error", f"Error in bulk processing (legacy): {str(e)}")
-
-    def cancel(self):
-        """Cancel the PDF generation process"""
-        self.cancelled = True
-
-
-class BatchProcessor:
-    """Handles batch processing operations with memory management"""
-    
-    def __init__(self, batch_size=10):
-        self.batch_size = batch_size
-    
-    def process_batches(self, items, processor_func, progress_callback=None):
-        """
-        Process items in batches
-        
-        Args:
-            items: List of items to process
-            processor_func: Function to process each batch
-            progress_callback: Optional callback for progress updates
-        """
-        total_items = len(items)
-        processed = 0
-        success_count = 0
-        error_count = 0
-        
-        for i in range(0, total_items, self.batch_size):
-            batch = items[i:i + self.batch_size]
-            batch_success, batch_errors = processor_func(batch)
-            
-            success_count += batch_success
-            error_count += batch_errors
-            processed += len(batch)
-            
-            if progress_callback:
-                progress = int((processed / total_items) * 100)
-                progress_callback(progress)
-                
-        return success_count, error_count
-
-
-class PrintWorker(QThread):
-    """Worker thread for batch printing"""
-    progress_updated = pyqtSignal(int)
-    job_updated = pyqtSignal(str)
-    finished = pyqtSignal(int, int)  # success_count, error_count
-    
-    def __init__(self, printer, employees, content_generator, page_settings_manager, batch_size=10):
-        super().__init__()
-        self.printer = printer
-        self.employees = employees
-        self.content_generator = content_generator
-        self.page_settings_manager = page_settings_manager
-        self.batch_size = batch_size
-        self.cancelled = False
-        
-    def run(self):
-        success_count = 0
-        error_count = 0
-        total = len(self.employees)
-        
-        for i, employee in enumerate(self.employees):
-            if self.cancelled:
-                break
-                
-            try:
-                emp_name = employee.get('name', 'Employee')
-                self.job_updated.emit(f"Printing payslip for {emp_name}...")
-                
-                payslip_content = self.content_generator(employee)
-                doc = QTextDocument()
-                doc.setPlainText(payslip_content)
-                self.page_settings_manager.configure_document(doc)
-                
-                doc.print_(self.printer)
-                success_count += 1
-                
-            except Exception as e:
-                error_count += 1
-                logger.error(f"Error printing for {emp_name}: {str(e)}")
-            
-            progress = int((i + 1) / total * 100)
-            self.progress_updated.emit(progress)
-            
-            # Memory cleanup
-            if (i + 1) % self.batch_size == 0:
-                QApplication.processEvents()
-                
-        self.finished.emit(success_count, error_count)
-    
-    def cancel(self):
-        self.cancelled = True
-
-class PrinterSelectionDialog(QDialog):
-    """Dialog for selecting a printer from available printers"""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Select Printer")
-        self.setMinimumWidth(300)
-        
-        layout = QVBoxLayout()
-        
-        # Add printer label
-        printer_label = QLabel("Available Printers:")
-        layout.addWidget(printer_label)
-        
-        # Printer list
-        self.printer_list = QComboBox()
-        self.refresh_printers()
-        layout.addWidget(self.printer_list)
-        
-        # Buttons
-        button_layout = QHBoxLayout()
-        refresh_btn = QPushButton("Refresh")
-        refresh_btn.clicked.connect(self.refresh_printers)
-        button_layout.addWidget(refresh_btn)
-        
-        ok_btn = QPushButton("OK")
-        ok_btn.clicked.connect(self.accept)
-        button_layout.addWidget(ok_btn)
-        
-        cancel_btn = QPushButton("Cancel")
-        cancel_btn.clicked.connect(self.reject)
-        button_layout.addWidget(cancel_btn)
-        
-        layout.addLayout(button_layout)
-        self.setLayout(layout)
-    
-    def refresh_printers(self):
-        """Refresh the list of available printers"""
-        self.printer_list.clear()
-        available_printers = QPrinterInfo.availablePrinters()
-        
-        # Add default printer first if it exists
-        default_printer = QPrinterInfo.defaultPrinter()
-        if default_printer:
-            self.printer_list.addItem(default_printer.printerName())
-            
-        # Add other printers
-        for printer in available_printers:
-            if printer.printerName() != default_printer.printerName():
-                self.printer_list.addItem(printer.printerName())
-                
-        if self.printer_list.count() == 0:
-            self.printer_list.addItem("No printers found")
-    
-    def selected_printer(self):
-        """Get the selected printer name"""
-        text = self.printer_list.currentText()
-        return text if text != "No printers found" else None
 
 class PayslipPrintManager:
     """Enhanced print manager that handles both printing and PDF generation for B4 paper size"""
