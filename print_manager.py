@@ -1,8 +1,5 @@
 import os
-import platform
-import tempfile
 import logging
-import subprocess
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, QThread, QSizeF, Qt
 from PyQt5.QtWidgets import QMessageBox, QDialog, QProgressBar, QLabel, QVBoxLayout, QPushButton, QHBoxLayout, QFileDialog, QApplication, QProgressDialog, QCheckBox, QComboBox
