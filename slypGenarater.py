@@ -1,5 +1,6 @@
 import pandas as pd
 from datetime import datetime
+from config import PayslipConfig  # Add this import
 
 def filter_payslip_items(items):
     """Filter out zero values and empty strings from payslip items"""
@@ -64,6 +65,25 @@ def format_date_only(val):
         return dt.strftime('%d/%m/%Y')
     except Exception:
         return str(val)
+
+def add_custom_entries(earnings, deductions, row, sheet_type):
+    """Add custom mapped entries to earnings and deductions"""
+    config = PayslipConfig()
+    mappings = config.get_mappings(sheet_type)
+    
+    # Add custom earnings
+    for display_name, excel_header in mappings['earnings'].items():
+        if excel_header in row:
+            value = row.get(excel_header, 0)
+            if pd.notnull(value):
+                earnings.append(f"{display_name:<20}{value:>12,.2f}")
+    
+    # Add custom deductions
+    for display_name, excel_header in mappings['deductions'].items():
+        if excel_header in row:
+            value = row.get(excel_header, 0)
+            if pd.notnull(value):
+                deductions.append(f"{display_name:15}{value:>12,.2f}")
 
 def generate_fixed_payslip(row):
     """Generate a payslip for FIXED April sheet."""
@@ -149,6 +169,8 @@ def generate_fixed_payslip(row):
     earnings = filter_payslip_item(earnings)
     deductions = filter_payslip_item(deductions)
 
+    # Add custom mapped entries
+    add_custom_entries(earnings, deductions, row, 'FIXED')
     # Format side-by-side layout
     combined_lines = combine_lines_fixed(earnings, deductions)
 
@@ -239,6 +261,8 @@ def generate_ftc_payslip(row):
     earnings = filter_payslip_item(earnings)
     deductions = filter_payslip_item(deductions)
 
+    # Add custom mapped entries
+    add_custom_entries(earnings, deductions, row, 'FTC')
     # Use the same combine_lines function as fixed payslip
     combined_lines = combine_lines_ftc(earnings, deductions)
 
