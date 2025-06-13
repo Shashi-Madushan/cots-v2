@@ -164,6 +164,7 @@ class ExcelSheetViewer(QMainWindow):
 
        self.selected_file = None
        self.current_df = None
+       self.current_headers = []  # Add this line after self.current_df initialization
 
 
    def select_file(self):
@@ -220,6 +221,7 @@ class ExcelSheetViewer(QMainWindow):
            # Read Excel with parse_dates=False to keep original format
            df = pd.read_excel(self.selected_file, sheet_name=sheet_name, header=1)
            self.current_df = df
+           self.current_headers = [str(h) for h in df.columns]  # Store headers
           
            # Known date columns (add any other date column names you have)
            date_columns = ['DOB', 'DOJ', 'D.O.B.', 'D.O.J', 'DATE']
@@ -515,14 +517,15 @@ class ExcelSheetViewer(QMainWindow):
 
 
    def show_config_dialog(self):
-       dialog = ConfigDialog(self)
+       dialog = ConfigDialog(self, self.current_headers)
        dialog.exec_()
 
 
 class ConfigDialog(QDialog):
-   def __init__(self, parent=None):
+   def __init__(self, parent=None, headers=None):
        super().__init__(parent)
        self.config = PayslipConfig()
+       self.headers = headers or []
        self.setup_ui()
 
 
@@ -534,24 +537,29 @@ class ConfigDialog(QDialog):
        # Sheet type selector
        self.sheet_type = QComboBox()
        self.sheet_type.addItems(['FIXED', 'FTC'])
+       layout.addWidget(QLabel("Sheet Type:"))
        layout.addWidget(self.sheet_type)
 
 
        # Type selector
        self.mapping_type = QComboBox()
        self.mapping_type.addItems(['earnings', 'deductions'])
+       layout.addWidget(QLabel("Mapping Type:"))
        layout.addWidget(self.mapping_type)
 
 
        # Display name input
+       layout.addWidget(QLabel("Display Name:"))
        self.display_name = QLineEdit()
-       self.display_name.setPlaceholderText("Display Name")  # Fixed method name
+       self.display_name.setPlaceholderText("Display Name")
        layout.addWidget(self.display_name)
 
 
-       # Excel header input
-       self.excel_header = QLineEdit()
-       self.excel_header.setPlaceholderText("Excel Column Header")  # Fixed method name
+       # Excel header dropdown
+       layout.addWidget(QLabel("Excel Column:"))
+       self.excel_header = QComboBox()
+       self.excel_header.addItems(self.headers)
+       self.excel_header.setEditable(True)
        layout.addWidget(self.excel_header)
 
 
@@ -562,6 +570,7 @@ class ConfigDialog(QDialog):
 
 
        # Current mappings list
+       layout.addWidget(QLabel("Current Mappings:"))
        self.mappings_list = QListWidget()
        self.update_mappings_list()
        layout.addWidget(self.mappings_list)
@@ -588,7 +597,7 @@ class ConfigDialog(QDialog):
 
    def add_mapping(self):
        display_name = self.display_name.text().strip()
-       excel_header = self.excel_header.text().strip()
+       excel_header = self.excel_header.currentText().strip()
       
        if display_name and excel_header:
            sheet_type = self.sheet_type.currentText()
