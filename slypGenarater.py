@@ -1,7 +1,6 @@
 import pandas as pd
 from datetime import datetime
-from config import PayslipConfig  # Add this import
-
+from config import PayslipConfig  
 def filter_payslip_items(items):
     """Filter out zero values and empty strings from payslip items"""
     filtered = []
