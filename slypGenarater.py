@@ -120,14 +120,22 @@ def add_custom_entries(earnings, deductions, row, sheet_type):
                 if pd.notnull(v):
                     deductions.append(f"{display_name:15}{safe_fmt(v,12)}")
 
+def get_payslip_month_year():
+    """Return the payslip month and year string, e.g., 'MAY 2025'."""
+    now = datetime.now()
+    month_str = now.strftime('%B').upper()
+    year_str = now.strftime('%Y')
+    return f"{month_str} {year_str}"
+
 def generate_fixed_payslip(row):
     """Generate a payslip for FIXED April sheet."""
     width = 100
     headerWidth= 80
 
+    payslip_month = get_payslip_month_year()
     header = (
         f"{'COATS THREAD EXPORTS (PVT) LTD - OPERATOR EMPLOYEES'.center(headerWidth)}\n"
-        f"{'PAY SLIP FOR THE MONTH OF MAY 2025'.center(headerWidth)}\n"
+        f"{('PAY SLIP FOR THE MONTH OF ' + payslip_month).center(headerWidth)}\n"
     )
 
     # Updated emp_info_lines to handle integers for emp no and account no
@@ -231,9 +239,10 @@ def generate_ftc_payslip(row):
     width = 100
     headerWidth= 80
 
+    payslip_month = get_payslip_month_year()
     header = (
         f"{'COATS THREAD EXPORTS (PVT) LTD - FTC EMPLOYEES'.center(headerWidth)}\n"
-        f"{'PAY SLIP FOR THE MONTH OF MAY 2025'.center(headerWidth)}\n"
+        f"{('PAY SLIP FOR THE MONTH OF ' + payslip_month).center(headerWidth)}\n"
     )
 
     # Updated emp_info_lines to handle integers for emp no and account no
