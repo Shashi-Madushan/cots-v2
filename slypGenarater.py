@@ -66,23 +66,59 @@ def format_date_only(val):
         return str(val)
 
 def add_custom_entries(earnings, deductions, row, sheet_type):
-    """Add custom mapped entries to earnings and deductions"""
+    """Add custom mapped entries to earnings and deductions (single or double column, only one display name)"""
     config = PayslipConfig()
     mappings = config.get_mappings(sheet_type)
-    
+
+    def get_val(col):
+        return row.get(col, 0) if col in row else 0
+
+    def safe_fmt(val, width=12):
+        try:
+            fval = float(val)
+            return f"{fval:>{width},.2f}"
+        except Exception:
+            return f"{str(val):>{width}}"
+
     # Add custom earnings
     for display_name, excel_header in mappings['earnings'].items():
-        if excel_header in row:
-            value = row.get(excel_header, 0)
-            if pd.notnull(value):
-                earnings.append(f"{display_name:<20}{value:>12,.2f}")
-    
+        if isinstance(display_name, str) and display_name.startswith('[') and display_name.endswith(']'):
+            try:
+                import ast
+                display_name = ast.literal_eval(display_name)
+            except Exception:
+                pass
+        if isinstance(excel_header, (list, tuple)) and len(excel_header) == 2:
+            col1, col2 = excel_header
+            if col1 in row and col2 in row:
+                v1, v2 = get_val(col1), get_val(col2)
+                if pd.notnull(v1) and pd.notnull(v2):
+                    earnings.append(f"{display_name:<20}{safe_fmt(v1,12)}{safe_fmt(v2,5)}")
+        elif isinstance(excel_header, str):
+            if excel_header in row:
+                v = get_val(excel_header)
+                if pd.notnull(v):
+                    earnings.append(f"{display_name:<20}{safe_fmt(v,12)}")
+
     # Add custom deductions
     for display_name, excel_header in mappings['deductions'].items():
-        if excel_header in row:
-            value = row.get(excel_header, 0)
-            if pd.notnull(value):
-                deductions.append(f"{display_name:15}{value:>12,.2f}")
+        if isinstance(display_name, str) and display_name.startswith('[') and display_name.endswith(']'):
+            try:
+                import ast
+                display_name = ast.literal_eval(display_name)
+            except Exception:
+                pass
+        if isinstance(excel_header, (list, tuple)) and len(excel_header) == 2:
+            col1, col2 = excel_header
+            if col1 in row and col2 in row:
+                v1, v2 = get_val(col1), get_val(col2)
+                if pd.notnull(v1) and pd.notnull(v2):
+                    deductions.append(f"{display_name:15}{safe_fmt(v1,12)}{safe_fmt(v2,5)}")
+        elif isinstance(excel_header, str):
+            if excel_header in row:
+                v = get_val(excel_header)
+                if pd.notnull(v):
+                    deductions.append(f"{display_name:15}{safe_fmt(v,12)}")
 
 def generate_fixed_payslip(row):
     """Generate a payslip for FIXED April sheet."""

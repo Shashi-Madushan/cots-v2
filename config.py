@@ -32,16 +32,26 @@ class PayslipConfig:
             json.dump(self.config, f, indent=4)
 
     def add_mapping(self, sheet_type, mapping_type, display_name, excel_header):
-        """Add a new mapping for earnings or deductions"""
+        """Add a new mapping for earnings or deductions.
+        display_name and excel_header can be strings (single column) or lists/tuples of two (double column).
+        """
         if sheet_type not in self.config:
             self.config[sheet_type] = {'earnings': {}, 'deductions': {}}
-        self.config[sheet_type][mapping_type][display_name] = excel_header
+        # Accept comma-separated string for double columns (for backward compatibility)
+        if isinstance(excel_header, str) and ',' in excel_header:
+            excel_header = [h.strip() for h in excel_header.split(',', 1)]
+        if isinstance(display_name, str) and ',' in display_name:
+            display_name = [d.strip() for d in display_name.split(',', 1)]
+        self.config[sheet_type][mapping_type][str(display_name) if isinstance(display_name, list) else display_name] = excel_header
         self.save_config()
 
     def remove_mapping(self, sheet_type, mapping_type, display_name):
         """Remove a mapping"""
         if sheet_type in self.config and mapping_type in self.config[sheet_type]:
+            # Try both string and list/tuple keys
             self.config[sheet_type][mapping_type].pop(display_name, None)
+            if isinstance(display_name, list):
+                self.config[sheet_type][mapping_type].pop(str(display_name), None)
             self.save_config()
 
     def get_mappings(self, sheet_type):

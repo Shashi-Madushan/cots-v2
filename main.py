@@ -522,102 +522,166 @@ class ExcelSheetViewer(QMainWindow):
 
 
 class ConfigDialog(QDialog):
-   def __init__(self, parent=None, headers=None):
-       super().__init__(parent)
-       self.config = PayslipConfig()
-       self.headers = headers or []
-       self.setup_ui()
+    def __init__(self, parent=None, headers=None):
+        super().__init__(parent)
+        self.config = PayslipConfig()
+        self.headers = headers or []
+        self.setup_ui()
+
+    def setup_ui(self):
+        self.setWindowTitle("Configure Custom Fields")
+        layout = QVBoxLayout()
 
 
-   def setup_ui(self):
-       self.setWindowTitle("Configure Custom Fields")
-       layout = QVBoxLayout()
+        # Sheet type selector
+        self.sheet_type = QComboBox()
+        self.sheet_type.addItems(['FIXED', 'FTC'])
+        layout.addWidget(QLabel("Sheet Type:"))
+        layout.addWidget(self.sheet_type)
 
 
-       # Sheet type selector
-       self.sheet_type = QComboBox()
-       self.sheet_type.addItems(['FIXED', 'FTC'])
-       layout.addWidget(QLabel("Sheet Type:"))
-       layout.addWidget(self.sheet_type)
+        # Type selector
+        self.mapping_type = QComboBox()
+        self.mapping_type.addItems(['earnings', 'deductions'])
+        layout.addWidget(QLabel("Mapping Type:"))
+        layout.addWidget(self.mapping_type)
 
 
-       # Type selector
-       self.mapping_type = QComboBox()
-       self.mapping_type.addItems(['earnings', 'deductions'])
-       layout.addWidget(QLabel("Mapping Type:"))
-       layout.addWidget(self.mapping_type)
+        # Mapping format selector
+        self.mapping_format = QComboBox()
+        self.mapping_format.addItems(['Single Column', 'Double Column'])
+        layout.addWidget(QLabel("Mapping Format:"))
+        layout.addWidget(self.mapping_format)
+        self.mapping_format.currentIndexChanged.connect(self.on_mapping_format_changed)
 
 
-       # Display name input
-       layout.addWidget(QLabel("Display Name:"))
-       self.display_name = QLineEdit()
-       self.display_name.setPlaceholderText("Display Name")
-       layout.addWidget(self.display_name)
+        # Display name input (only one)
+        self.display_name1_label = QLabel("Display Name:")
+        layout.addWidget(self.display_name1_label)
+        self.display_name1 = QLineEdit()
+        self.display_name1.setPlaceholderText("Display Name")
+        layout.addWidget(self.display_name1)
+
+        # Remove Display Name 2
+        # self.display_name2_label = QLabel("Display Name 2:")
+        # layout.addWidget(self.display_name2_label)
+        # self.display_name2 = QLineEdit()
+        # self.display_name2.setPlaceholderText("Display Name 2")
+        # layout.addWidget(self.display_name2)
+        # self.display_name2_label.hide()
+        # self.display_name2.hide()
 
 
-       # Excel header dropdown
-       layout.addWidget(QLabel("Excel Column:"))
-       self.excel_header = QComboBox()
-       self.excel_header.addItems(self.headers)
-       self.excel_header.setEditable(True)
-       layout.addWidget(self.excel_header)
+        # Excel header dropdown(s)
+        self.excel_header1_label = QLabel("Excel Column 1:")
+        layout.addWidget(self.excel_header1_label)
+        self.excel_header1 = QComboBox()
+        self.excel_header1.addItems(self.headers)
+        self.excel_header1.setEditable(True)
+        layout.addWidget(self.excel_header1)
+
+        self.excel_header2_label = QLabel("Excel Column 2:")
+        layout.addWidget(self.excel_header2_label)
+        self.excel_header2 = QComboBox()
+        self.excel_header2.addItems(self.headers)
+        self.excel_header2.setEditable(True)
+        layout.addWidget(self.excel_header2)
+        self.excel_header2_label.hide()
+        self.excel_header2.hide()
 
 
-       # Add mapping button
-       add_button = QPushButton("Add Mapping")
-       add_button.clicked.connect(self.add_mapping)
-       layout.addWidget(add_button)
+        # Add mapping button
+        add_button = QPushButton("Add Mapping")
+        add_button.clicked.connect(self.add_mapping)
+        layout.addWidget(add_button)
 
 
-       # Current mappings list
-       layout.addWidget(QLabel("Current Mappings:"))
-       self.mappings_list = QListWidget()
-       self.update_mappings_list()
-       layout.addWidget(self.mappings_list)
+        # Current mappings list
+        layout.addWidget(QLabel("Current Mappings:"))
+        self.mappings_list = QListWidget()
+        self.update_mappings_list()
+        layout.addWidget(self.mappings_list)
 
 
-       # Remove mapping button
-       remove_button = QPushButton("Remove Selected")
-       remove_button.clicked.connect(self.remove_mapping)
-       layout.addWidget(remove_button)
+        # Remove mapping button
+        remove_button = QPushButton("Remove Selected")
+        remove_button.clicked.connect(self.remove_mapping)
+        layout.addWidget(remove_button)
 
 
-       self.setLayout(layout)
+        self.setLayout(layout)
 
 
-   def update_mappings_list(self):
-       self.mappings_list.clear()
-       sheet_type = self.sheet_type.currentText()
-       mapping_type = self.mapping_type.currentText()
-       mappings = self.config.get_mappings(sheet_type)[mapping_type]
-      
-       for display_name, excel_header in mappings.items():
-           self.mappings_list.addItem(f"{display_name} → {excel_header}")
+    def on_mapping_format_changed(self, idx):
+        if self.mapping_format.currentText() == "Double Column":
+            # Only show the second column input, not display name
+            self.excel_header2_label.show()
+            self.excel_header2.show()
+        else:
+            self.excel_header2_label.hide()
+            self.excel_header2.hide()
 
 
-   def add_mapping(self):
-       display_name = self.display_name.text().strip()
-       excel_header = self.excel_header.currentText().strip()
-      
-       if display_name and excel_header:
-           sheet_type = self.sheet_type.currentText()
-           mapping_type = self.mapping_type.currentText()
-          
-           self.config.add_mapping(sheet_type, mapping_type, display_name, excel_header)
-           self.update_mappings_list()
-           self.display_name.clear()
-           self.excel_header.clear()
+    def update_mappings_list(self):
+        self.mappings_list.clear()
+        sheet_type = self.sheet_type.currentText()
+        mapping_type = self.mapping_type.currentText()
+        mappings = self.config.get_mappings(sheet_type)[mapping_type]
+        for display_name, excel_header in mappings.items():
+            # Only show one display name, but both columns if double
+            if isinstance(excel_header, (list, tuple)) and len(excel_header) == 2:
+                col1, col2 = excel_header
+            else:
+                col1, col2 = excel_header, ""
+            self.mappings_list.addItem(f"{display_name} | {col1} | {col2}")
 
 
-   def remove_mapping(self):
-       current_item = self.mappings_list.currentItem()
-       if current_item:
-           display_name = current_item.text().split(' → ')[0]
-           sheet_type = self.sheet_type.currentText()
-           mapping_type = self.mapping_type.currentText()
-          
-           self.config.remove_mapping(sheet_type, mapping_type, display_name)
-           self.update_mappings_list()
+    def add_mapping(self):
+        mapping_format = self.mapping_format.currentText()
+        sheet_type = self.sheet_type.currentText()
+        mapping_type = self.mapping_type.currentText()
+        dn1 = self.display_name1.text().strip()
+        col1 = self.excel_header1.currentText().strip()
+        col2 = self.excel_header2.currentText().strip()
+        if mapping_format == "Double Column":
+            if dn1 and col1 and col2:
+                display_name = dn1
+                excel_header = [col1, col2]
+            else:
+                return
+        else:
+            if dn1 and col1:
+                display_name = dn1
+                excel_header = col1
+            else:
+                return
+        self.config.add_mapping(sheet_type, mapping_type, display_name, excel_header)
+        self.update_mappings_list()
+        self.display_name1.clear()
+        self.excel_header1.setCurrentIndex(0)
+        self.excel_header2.setCurrentIndex(0)
+
+
+    def remove_mapping(self):
+        current_item = self.mappings_list.currentItem()
+        if current_item:
+            # Remove by display_name (could be list or string)
+            text = current_item.text()
+            dn1 = text.split(' | ')[0]
+            dn2 = text.split(' | ')[1]
+            sheet_type = self.sheet_type.currentText()
+            mapping_type = self.mapping_type.currentText()
+            mappings = self.config.get_mappings(sheet_type)[mapping_type]
+            # Find the key (display_name) to remove
+            for k in list(mappings.keys()):
+                if isinstance(k, (list, tuple)):
+                    if len(k) == 2 and k[0] == dn1 and k[1] == dn2:
+                        self.config.remove_mapping(sheet_type, mapping_type, k)
+                        break
+                elif k == dn1:
+                    self.config.remove_mapping(sheet_type, mapping_type, k)
+                    break
+            self.update_mappings_list()
 
 
 def main():
@@ -628,4 +692,5 @@ def main():
 
 
 if __name__ == "__main__":
+   main()
    main()

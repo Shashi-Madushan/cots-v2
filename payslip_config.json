@@ -1,6 +1,11 @@
 {
     "FIXED": {
-        "earnings": {},
+        "earnings": {
+            "test": [
+                "NORMAL OT",
+                "OT HRS"
+            ]
+        },
         "deductions": {}
     },
     "FTC": {
