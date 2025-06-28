@@ -144,8 +144,7 @@ def generate_fixed_payslip(row):
         f"{'NAME':<12}  {row['NAME']:<26}{'DEPARTMENT':<14}  {row['DEPARTMENT']}",
         f"{'DESIGNATION':<12}  {row['DESIGNATION']:<26}{'D.O.B':<14}  {format_date_only(row['DOB'])}",
         f"{'D.O.J':<12}  {format_date_only(row['DOJ']):<26}{'E.P.F.NO':<14}  {str(int(float(row['EPF  NO'])))}",
-        f"{'':<12}  {'':<26}{'SAP NO':<14}  WF{str(int(float(row['EMP NO '])))}",
-    ]
+        f"{'':<12}  {'':<26}{'SAP NO':<14}  {str(row['REF NO'])}",    ]
 
     emp_info = '\n'.join(emp_info_lines)
 
@@ -158,30 +157,30 @@ def generate_fixed_payslip(row):
 
     # List of earnings
     earnings = [
-        f"{'BASIC SAL':<20}{row['BASIC SAL']:>12,.2f}",
-        f"{'B.R ALLOWA':<20}{row['B.R ALLOWA']:>12,.2f}",
-        f"{'MEDICAL':<20}{row['MEDICAL']:>12,.2f}",
-        f"{'ACTING AL':<20}{row['ACTING AL2']:>12,.2f}",
-        f"{'INCENTIVE':<20}{row['INCENTIVE']:>12,.2f}",
-        f"{'SHIFT ALLO':<20}{row['SHIFT ALLO']:>12,.2f}",
-        f"{'DISCRETIONARY INC':<20}{row['Dis cre- Fuel']:>12,.2f}",
-        f"{'NORMAL OT':<20}{row['NORMAL OT']:>12,.2f}{row[row.index[row.index.get_loc('NORMAL OT') + 1]]:>5,.2f}",
-        f"{'TRIPPLE OT':<20}{row['TRIPPLE OT']:>12,.2f}{row[row.index[row.index.get_loc('TRIPPLE OT') + 1]]:>5,.2f}",
-        f"{'DOUBBLE OT':<20}{row['DOUBBLE OT']:>12,.2f}{row[row.index[row.index.get_loc('DOUBBLE OT') + 1]]:>5,.2f}",
-        f"{'FIRST AID':<20}{row['FIRST AID']:>12,.2f}",
-        f"{'FIRE TEAM':<20}{row['FIRE TEAM']:>12,.2f}",
-        f"{'RELOCATION':<20}{row['RELOCATION']:>12,.2f}",
-        f"{'SOSU ALLOW':<20}{row['SOSU ALLOW']:>12,.2f}",
-        f"{'NO PAY COR':<20}{row['NO PAY COR']:>12,.2f}",
-        f"{'APPLAUSE PAYMENT':<20}{row['APPLAUSE PAYMENT']:>12,.2f}",
-        f"{'FE NIG SHI':<20}{row['FE NIG SHI']:>12,.2f}",
-        f"{'BALANCE LEAVE':<20}{row['BALANCE LEAVE']:>12,.2f}",
-        f"{'SPEC SOSU':<20}{row['SPEC SOSU']:>12,.2f}",
-        f"{'TAX REFUD':<20}{row['Tax Refund']:>12,.2f}",
-        f"{'SUNDAY WAGES FOR EPF':<20}{row['Sunday Wages']:>12,.2f}",
-        f"{'ARREARS DOUBLE OT':<20}{row['Arrears Double OT']:>12,.2f}{row[row.index[row.index.get_loc('Arrears Double OT') + 1]]:>5,.2f}",
-        f"{'ARREARS TRIPLE OT':<20}{row['Arrears Triple OT']:>12,.2f}{row[row.index[row.index.get_loc('Arrears Triple OT') + 1]]:>5,.2f}",
-        f"{'ARREARS NORMAL OT':<20}{row['Arrears NOT']:>12,.2f}{row[row.index[row.index.get_loc('Arrears NOT') + 1]]:>5,.2f}",
+        f"{'BASIC SAL':<20}{row['BASIC SAL']:>11,.2f}",
+        f"{'B.R ALLOWA':<20}{row['B.R ALLOWA']:>11,.2f}",
+        f"{'MEDICAL':<20}{row['MEDICAL']:>11,.2f}",
+        f"{'ACTING AL':<20}{row['ACTING AL2']:>11,.2f}",
+        f"{'INCENTIVE':<20}{row['INCENTIVE']:>11,.2f}",
+        f"{'SHIFT ALLO':<20}{row['SHIFT ALLO']:>11,.2f}",
+        f"{'DISCRETIONARY INC':<20}{row['Dis cre- Fuel']:>11,.2f}",
+        f"{'NORMAL OT':<20}{row['NORMAL OT']:>11,.2f} {row[row.index[row.index.get_loc('NORMAL OT') + 1]]:>5,.2f}",
+        f"{'TRIPPLE OT':<20}{row['TRIPPLE OT']:>11,.2f} {row[row.index[row.index.get_loc('TRIPPLE OT') + 1]]:>5,.2f}",
+        f"{'DOUBBLE OT':<20}{row['DOUBBLE OT']:>11,.2f} {row[row.index[row.index.get_loc('DOUBBLE OT') + 1]]:>5,.2f}",
+        f"{'FIRST AID':<20}{row['FIRST AID']:>11,.2f}",
+        f"{'FIRE TEAM':<20}{row['FIRE TEAM']:>11,.2f}",
+        f"{'RELOCATION':<20}{row['RELOCATION']:>11,.2f}",
+        f"{'SOSU ALLOW':<20}{row['SOSU ALLOW']:>11,.2f}",
+        f"{'NO PAY COR':<20}{row['NO PAY COR']:>11,.2f}",
+        f"{'APPLAUSE PAYMENT':<20}{row['APPLAUSE PAYMENT']:>11,.2f}",
+        f"{'FE NIG SHI':<20}{row['FE NIG SHI']:>11,.2f}",
+        f"{'BALANCE LEAVE':<20}{row['BALANCE LEAVE']:>11,.2f}",
+        f"{'SPEC SOSU':<20}{row['SPEC SOSU']:>11,.2f}",
+        f"{'TAX REFUD':<20}{row['Tax Refund']:>11,.2f}",
+        f"{'SUNDAY WAGES FOR EPF':<20}{row['Sunday Wages']:>11,.2f}",
+        f"{'ARREARS DOUBLE OT':<20}{row['Arrears Double OT']:>11,.2f} {row[row.index[row.index.get_loc('Arrears Double OT') + 1]]:>5,.2f}",
+        f"{'ARREARS TRIPLE OT':<20}{row['Arrears Triple OT']:>11,.2f} {row[row.index[row.index.get_loc('Arrears Triple OT') + 1]]:>5,.2f}",
+        f"{'ARREARS NORMAL OT':<20}{row['Arrears NOT']:>11,.2f} {row[row.index[row.index.get_loc('Arrears NOT') + 1]]:>5,.2f}",
     ]
 
     # List of deductions
@@ -189,7 +188,7 @@ def generate_fixed_payslip(row):
         f"{'EPF YEE':15}{row['EPF YEE']:>12,.2f}",
         f"{'NO PAY':15}{row['NO PAY']:>12,.2f}{row[row.index[row.index.get_loc('NO PAY') + 1]]:>12,.2f}",
         f"{'LATE MINUTE':15}{row['Late Minute']:>12,.2f}{row[row.index[row.index.get_loc('Late Minute') + 1]]:>12,.2f}",
-        f"{'WELFARE':15}{row['WELFARE']:>12,.2f}",
+        # f"{'WELFARE':15}{row['WELFARE']:>12,.2f}",
         f"{'SPORTS CLU':15}{row['SPORTS CLU']:>12,.2f}",
         f"{'FAIR FIRST':15}{row['FAIR FIRST']:>12,.2f}",
         f"{'UNION ICE':15}{row['UNION ICE']:>12,.2f}",
@@ -219,8 +218,7 @@ def generate_fixed_payslip(row):
 
     # Footer aligned
     footer_lines = [
-        f"{'TOT EARNINGS':<18}  {row['TOT EARN']:>12,.2f}       {' TOT DEDUCTIONS':<18}  {row['TOT DED']:>8,.2f}",
-        "",
+        f"{'TOT EARNINGS':<18}  {row['TOT EARN']:>11,.2f}       {' TOT DEDUCTIONS':<18}  {row['TOT DED']:>9,.2f}",        "",
         f"{'EPF YEE 8%':<18}  {row['EPF YEE']:>12,.2f}       {' NET PAY':<16}  {row['netpay']:>10,.2f}",
         f"{'ETF YER 3%':<18}  {row['ETF YER']:>12,.2f}       {' BANK PAYMENT':<16}  {row['netpay']:>10,.2f}",
         f"{'EPF YER 12%':<18}  {row['EPF YER']:>12,.2f}",
@@ -251,8 +249,7 @@ def generate_ftc_payslip(row):
         f"{'NAME':<15}  {row['NAME']:<24}{'DEPARTMENT':<16}  {row['DEPARTMENT']}",
         f"{'DESIGNATION':<15}  {row['DESIGNATION']:<24}{'D.O.B':<16}  {format_date_only(row['DOB'])}",
         f"{'D.O.J':<15}  {format_date_only(row['DOJ']):<24}{'E.P.F.NO':<16}  {str(int(float(row['EPF  NO'])))}",
-        f"{'RATE':<15}  {int(row.get('BASIC SAL', 0)):<24}{'SAP NO':<16}  WF{str(int(float(row['EMP NO '])))}",
-    ]
+        f"{'RATE':<15}  {str(int(float(row['RATE']))):<24}",    ]
 
     emp_info = '\n'.join(emp_info_lines)
 
