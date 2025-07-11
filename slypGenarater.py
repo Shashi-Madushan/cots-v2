@@ -201,7 +201,7 @@ def generate_fixed_payslip(row):
         f"{'SALARY OVER PAY':15}{row['Salary Over Payment']:>12,.2f}",
         f"{'WIJAYARADI HIRE':15}{row['WIJAYA RADIO']:>12,.2f}{row[row.index[row.index.get_loc('WIJAYA RADIO') + 1]]:>12,.2f}",
         f"{'HIREPUR SINGER':15}{row['Singer']:>12,.2f}{row[row.index[row.index.get_loc('Singer') + 1]]:>12,.2f}",
-        f"{'EDUCATIONAL ASSISTANT':15}{row['EDUCATIONAL ASSISTANT']:>12,.2f}{row[row.index[row.index.get_loc('EDUCATIONAL ASSISTANT') + 1]]:>12,.2f}",
+        # f"{'EDUCATIONAL ASSISTANT':15}{row['EDUCATIONAL ASSISTANT']:>12,.2f}{row[row.index[row.index.get_loc('EDUCATIONAL ASSISTANT') + 1]]:>12,.2f}",
         f"{'MOCY GURANTER':15}{row['MOCY GURANTER']:>12,.2f}",
         f"{'MOCY GURA INT':15}{row['MOCY GURANTER INT']:>12,.2f}",
     ]
@@ -293,7 +293,7 @@ def generate_ftc_payslip(row):
         f"{'P.L.D.C.Sampath':15}{row.get('P.L.D.C.Sampath', 0):>12,.2f}",
         f"{'APIT TAX':15}{row.get('APIT TAX', 0):>12,.2f}",
         f"{'WIJAYA RADIO':15}{row.get('WIJAYA RADIO', 0):>12,.2f}",
-        f"{'EDUCATIONAL ASSISTANT':15}{row.get('EDUCATIONAL ASSISTANT', 0):>12,.2f}",
+        # f"{'EDUCATIONAL ASSISTANT':15}{row.get('EDUCATIONAL ASSISTANT', 0):>12,.2f}",
         f"{'FOOT CYCLE LOAN':15}{row.get('FOOT CYCLE LOAN', 0):>12,.2f}",
         f"{'Singer':15}{row.get('Singer', 0):>12,.2f}",
     ]
