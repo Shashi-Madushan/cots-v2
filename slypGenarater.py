@@ -1,4 +1,6 @@
 import pandas as pd
+import math
+import re
 from datetime import datetime
 from config import PayslipConfig  
 def filter_payslip_items(items):
@@ -34,19 +36,28 @@ def filter_payslip_item(items):
     """
     filtered = []
     for line in items:
-        # Extract all monetary values like 1,200.00, -45.00, etc.
-        matches = re.findall(r"[-+]?\d[\d,]*\.\d{2}", line)
-        # Convert to float
-        values = []
+        if not line or not line.strip():
+            continue
+            
+        # Extract all monetary values like 1,200.00, -45.00, 0.00, etc.
+        # Updated regex to better match monetary formats
+        matches = re.findall(r"[-+]?\d{1,3}(?:,\d{3})*\.\d{2}", line)
+        
+        # Convert to float and check for valid values
+        has_valid_value = False
         for val in matches:
             try:
                 val_float = float(val.replace(",", ""))
-                values.append(val_float)
-            except:
+                if val_float != 0.0 and not math.isnan(val_float):
+                    has_valid_value = True
+                    break
+            except (ValueError, TypeError):
                 continue
-        # Keep line if at least one number is valid (not 0.00 or NaN)
-        if any(v != 0.0 and not math.isnan(v) for v in values):
+        
+        # Keep line if it has at least one valid (non-zero) value
+        if has_valid_value:
             filtered.append(line)
+            
     return filtered
 
 
@@ -79,6 +90,16 @@ def add_custom_entries(earnings, deductions, row, sheet_type):
             return f"{fval:>{width},.2f}"
         except Exception:
             return f"{str(val):>{width}}"
+    
+    def is_valid_value(val):
+        """Check if value is valid (not zero, null, or NaN)"""
+        if pd.isnull(val):
+            return False
+        try:
+            float_val = float(val)
+            return float_val != 0.0 and not math.isnan(float_val)
+        except (ValueError, TypeError):
+            return False
 
     # Add custom earnings
     for display_name, excel_header in mappings['earnings'].items():
@@ -92,12 +113,14 @@ def add_custom_entries(earnings, deductions, row, sheet_type):
             col1, col2 = excel_header
             if col1 in row and col2 in row:
                 v1, v2 = get_val(col1), get_val(col2)
-                if pd.notnull(v1) and pd.notnull(v2):
+                # Only add if at least one value is valid (non-zero)
+                if is_valid_value(v1) or is_valid_value(v2):
                     earnings.append(f"{display_name:<20}{safe_fmt(v1,12)}{safe_fmt(v2,5)}")
         elif isinstance(excel_header, str):
             if excel_header in row:
                 v = get_val(excel_header)
-                if pd.notnull(v):
+                # Only add if value is valid (non-zero)
+                if is_valid_value(v):
                     earnings.append(f"{display_name:<20}{safe_fmt(v,12)}")
 
     # Add custom deductions
@@ -112,12 +135,14 @@ def add_custom_entries(earnings, deductions, row, sheet_type):
             col1, col2 = excel_header
             if col1 in row and col2 in row:
                 v1, v2 = get_val(col1), get_val(col2)
-                if pd.notnull(v1) and pd.notnull(v2):
+                # Only add if at least one value is valid (non-zero)
+                if is_valid_value(v1) or is_valid_value(v2):
                     deductions.append(f"{display_name:15}{safe_fmt(v1,12)}{safe_fmt(v2,5)}")
         elif isinstance(excel_header, str):
             if excel_header in row:
                 v = get_val(excel_header)
-                if pd.notnull(v):
+                # Only add if value is valid (non-zero)
+                if is_valid_value(v):
                     deductions.append(f"{display_name:15}{safe_fmt(v,12)}")
 
 def get_payslip_month_year():
@@ -133,6 +158,16 @@ def generate_earnings_from_config(row, sheet_type):
     mappings = config.get_mappings(sheet_type)
     earnings = []
     
+    def is_valid_value(val):
+        """Check if value is valid (not zero, null, or NaN)"""
+        if pd.isnull(val):
+            return False
+        try:
+            float_val = float(val)
+            return float_val != 0.0 and not math.isnan(float_val)
+        except (ValueError, TypeError):
+            return False
+    
     for display_name, excel_header in mappings['earnings'].items():
         if isinstance(excel_header, list) and len(excel_header) == 2:
             col1, col2 = excel_header
@@ -154,12 +189,17 @@ def generate_earnings_from_config(row, sheet_type):
                         v2 = 0
                 else:
                     v2 = row.get(col2, 0)
-                earnings.append(f"{display_name:<20}{v1:>12,.2f}{v2:>5,.2f}")
+                
+                # Only add if at least one value is valid (non-zero)
+                if is_valid_value(v1) or is_valid_value(v2):
+                    earnings.append(f"{display_name:<20}{v1:>12,.2f}{v2:>5,.2f}")
         else:
             # Single column
             if excel_header in row:
                 v = row.get(excel_header, 0)
-                earnings.append(f"{display_name:<20}{v:>12,.2f}")
+                # Only add if value is valid (non-zero)
+                if is_valid_value(v):
+                    earnings.append(f"{display_name:<20}{v:>12,.2f}")
     
     return earnings
 
@@ -168,6 +208,16 @@ def generate_deductions_from_config(row, sheet_type):
     config = PayslipConfig()
     mappings = config.get_mappings(sheet_type)
     deductions = []
+    
+    def is_valid_value(val):
+        """Check if value is valid (not zero, null, or NaN)"""
+        if pd.isnull(val):
+            return False
+        try:
+            float_val = float(val)
+            return float_val != 0.0 and not math.isnan(float_val)
+        except (ValueError, TypeError):
+            return False
     
     for display_name, excel_header in mappings['deductions'].items():
         if isinstance(excel_header, list) and len(excel_header) == 2:
@@ -190,12 +240,17 @@ def generate_deductions_from_config(row, sheet_type):
                         v2 = 0
                 else:
                     v2 = row.get(col2, 0)
-                deductions.append(f"{display_name:15}{v1:>12,.2f}{v2:>12,.2f}")
+                
+                # Only add if at least one value is valid (non-zero)
+                if is_valid_value(v1) or is_valid_value(v2):
+                    deductions.append(f"{display_name:15}{v1:>12,.2f}{v2:>12,.2f}")
         else:
             # Single column
             if excel_header in row:
                 v = row.get(excel_header, 0)
-                deductions.append(f"{display_name:15}{v:>12,.2f}")
+                # Only add if value is valid (non-zero)
+                if is_valid_value(v):
+                    deductions.append(f"{display_name:15}{v:>12,.2f}")
     
     return deductions
 
@@ -231,12 +286,12 @@ def generate_fixed_payslip(row):
     earnings = generate_earnings_from_config(row, 'FIXED')
     deductions = generate_deductions_from_config(row, 'FIXED')
 
-    # Filter out 0.00 or blank values
+    # Add custom mapped entries (now includes filtering at source)
+    add_custom_entries(earnings, deductions, row, 'FIXED')
+    
+    # Additional filtering as safety net (should be minimal now)
     earnings = filter_payslip_item(earnings)
     deductions = filter_payslip_item(deductions)
-
-    # Add custom mapped entries
-    add_custom_entries(earnings, deductions, row, 'FIXED')
     # Format side-by-side layout
     combined_lines = combine_lines_fixed(earnings, deductions)
 
@@ -285,12 +340,12 @@ def generate_ftc_payslip(row):
     earnings = generate_earnings_from_config(row, 'FTC')
     deductions = generate_deductions_from_config(row, 'FTC')
 
-    # Filter out 0.00 or blank values
+    # Add custom mapped entries (now includes filtering at source)
+    add_custom_entries(earnings, deductions, row, 'FTC')
+    
+    # Additional filtering as safety net (should be minimal now)
     earnings = filter_payslip_item(earnings)
     deductions = filter_payslip_item(deductions)
-
-    # Add custom mapped entries
-    add_custom_entries(earnings, deductions, row, 'FTC')
     # Use the same combine_lines function as fixed payslip
     combined_lines = combine_lines_ftc(earnings, deductions)
 
