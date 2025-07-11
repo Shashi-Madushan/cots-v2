@@ -530,12 +530,15 @@ class ConfigDialog(QDialog):
 
     def setup_ui(self):
         self.setWindowTitle("Configure Custom Fields")
+        self.setMinimumSize(500, 600)  # Set minimum size
+        self.resize(600, 700)  # Set initial size
         layout = QVBoxLayout()
 
 
         # Sheet type selector
         self.sheet_type = QComboBox()
         self.sheet_type.addItems(['FIXED', 'FTC'])
+        self.sheet_type.currentTextChanged.connect(self.update_mappings_list)
         layout.addWidget(QLabel("Sheet Type:"))
         layout.addWidget(self.sheet_type)
 
@@ -543,6 +546,7 @@ class ConfigDialog(QDialog):
         # Type selector
         self.mapping_type = QComboBox()
         self.mapping_type.addItems(['earnings', 'deductions'])
+        self.mapping_type.currentTextChanged.connect(self.update_mappings_list)
         layout.addWidget(QLabel("Mapping Type:"))
         layout.addWidget(self.mapping_type)
 
@@ -597,7 +601,9 @@ class ConfigDialog(QDialog):
 
 
         # Current mappings list
-        layout.addWidget(QLabel("Current Mappings:"))
+        self.mappings_status_label = QLabel()
+        layout.addWidget(self.mappings_status_label)
+        
         self.mappings_list = QListWidget()
         self.update_mappings_list()
         layout.addWidget(self.mappings_list)
@@ -623,17 +629,30 @@ class ConfigDialog(QDialog):
 
 
     def update_mappings_list(self):
+        """Update the mappings list based on current sheet type and mapping type selection"""
         self.mappings_list.clear()
         sheet_type = self.sheet_type.currentText()
         mapping_type = self.mapping_type.currentText()
+        
+        # Update status label
+        self.mappings_status_label.setText(f"Current Mappings ({sheet_type} - {mapping_type.title()}):")
+        
+        # Get mappings for the selected sheet type and mapping type
         mappings = self.config.get_mappings(sheet_type)[mapping_type]
+        
+        if not mappings:
+            self.mappings_list.addItem("No mappings configured for this combination")
+            return
+        
         for display_name, excel_header in mappings.items():
-            # Only show one display name, but both columns if double
+            # Format the display text based on whether it's single or double column
             if isinstance(excel_header, (list, tuple)) and len(excel_header) == 2:
                 col1, col2 = excel_header
+                item_text = f"{display_name} → [{col1}, {col2}]"
             else:
-                col1, col2 = excel_header, ""
-            self.mappings_list.addItem(f"{display_name} | {col1} | {col2}")
+                item_text = f"{display_name} → {excel_header}"
+            
+            self.mappings_list.addItem(item_text)
 
 
     def add_mapping(self):
@@ -643,45 +662,74 @@ class ConfigDialog(QDialog):
         dn1 = self.display_name1.text().strip()
         col1 = self.excel_header1.currentText().strip()
         col2 = self.excel_header2.currentText().strip()
+        
         if mapping_format == "Double Column":
             if dn1 and col1 and col2:
                 display_name = dn1
                 excel_header = [col1, col2]
             else:
+                QMessageBox.warning(self, "Incomplete Data", "Please fill in display name and both column names for double column mapping.")
                 return
         else:
             if dn1 and col1:
                 display_name = dn1
                 excel_header = col1
             else:
+                QMessageBox.warning(self, "Incomplete Data", "Please fill in display name and column name for single column mapping.")
                 return
+        
+        # Add the mapping
         self.config.add_mapping(sheet_type, mapping_type, display_name, excel_header)
+        
+        # Update the list to show the new mapping
         self.update_mappings_list()
+        
+        # Clear input fields
         self.display_name1.clear()
         self.excel_header1.setCurrentIndex(0)
         self.excel_header2.setCurrentIndex(0)
+        
+        # Show success message
+        QMessageBox.information(self, "Success", f"Mapping '{display_name}' has been added to {sheet_type} {mapping_type}.")
 
 
     def remove_mapping(self):
+        """Remove the selected mapping from the configuration"""
         current_item = self.mappings_list.currentItem()
         if current_item:
-            # Remove by display_name (could be list or string)
             text = current_item.text()
-            dn1 = text.split(' | ')[0]
-            dn2 = text.split(' | ')[1]
-            sheet_type = self.sheet_type.currentText()
-            mapping_type = self.mapping_type.currentText()
-            mappings = self.config.get_mappings(sheet_type)[mapping_type]
-            # Find the key (display_name) to remove
-            for k in list(mappings.keys()):
-                if isinstance(k, (list, tuple)):
-                    if len(k) == 2 and k[0] == dn1 and k[1] == dn2:
-                        self.config.remove_mapping(sheet_type, mapping_type, k)
-                        break
-                elif k == dn1:
-                    self.config.remove_mapping(sheet_type, mapping_type, k)
-                    break
-            self.update_mappings_list()
+            
+            # Check if this is the "No mappings" message
+            if text.startswith("No mappings configured"):
+                QMessageBox.information(self, "No Mappings", "There are no mappings to remove for this combination.")
+                return
+            
+            # Parse the display text to extract the display name
+            if ' → ' in text:
+                display_name = text.split(' → ')[0].strip()
+                
+                sheet_type = self.sheet_type.currentText()
+                mapping_type = self.mapping_type.currentText()
+                
+                # Confirm deletion
+                reply = QMessageBox.question(self, "Confirm Removal", 
+                                           f"Are you sure you want to remove the mapping '{display_name}'?",
+                                           QMessageBox.Yes | QMessageBox.No, 
+                                           QMessageBox.No)
+                
+                if reply == QMessageBox.Yes:
+                    # Remove the mapping using the display name as key
+                    self.config.remove_mapping(sheet_type, mapping_type, display_name)
+                    
+                    # Update the list to reflect the change
+                    self.update_mappings_list()
+                    
+                    # Show success message
+                    QMessageBox.information(self, "Success", f"Mapping '{display_name}' has been removed.")
+            else:
+                QMessageBox.warning(self, "Error", "Invalid mapping format selected.")
+        else:
+            QMessageBox.information(self, "No Selection", "Please select a mapping to remove.")
 
 
 def main():
