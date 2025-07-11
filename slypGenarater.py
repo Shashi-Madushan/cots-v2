@@ -127,6 +127,78 @@ def get_payslip_month_year():
     year_str = now.strftime('%Y')
     return f"{month_str} {year_str}"
 
+def generate_earnings_from_config(row, sheet_type):
+    """Generate earnings list from configuration"""
+    config = PayslipConfig()
+    mappings = config.get_mappings(sheet_type)
+    earnings = []
+    
+    for display_name, excel_header in mappings['earnings'].items():
+        if isinstance(excel_header, list) and len(excel_header) == 2:
+            col1, col2 = excel_header
+            if col1 in row:
+                v1 = row.get(col1, 0)
+                if col2 == "next_column":
+                    # Get the next column after col1
+                    try:
+                        col1_idx = row.index.get_loc(col1)
+                        v2 = row.iloc[col1_idx + 1] if col1_idx + 1 < len(row) else 0
+                    except:
+                        v2 = 0
+                elif col2 == "prev_column":
+                    # Get the previous column before col1
+                    try:
+                        col1_idx = row.index.get_loc(col1)
+                        v2 = row.iloc[col1_idx - 1] if col1_idx - 1 >= 0 else 0
+                    except:
+                        v2 = 0
+                else:
+                    v2 = row.get(col2, 0)
+                earnings.append(f"{display_name:<20}{v1:>12,.2f}{v2:>5,.2f}")
+        else:
+            # Single column
+            if excel_header in row:
+                v = row.get(excel_header, 0)
+                earnings.append(f"{display_name:<20}{v:>12,.2f}")
+    
+    return earnings
+
+def generate_deductions_from_config(row, sheet_type):
+    """Generate deductions list from configuration"""
+    config = PayslipConfig()
+    mappings = config.get_mappings(sheet_type)
+    deductions = []
+    
+    for display_name, excel_header in mappings['deductions'].items():
+        if isinstance(excel_header, list) and len(excel_header) == 2:
+            col1, col2 = excel_header
+            if col1 in row:
+                v1 = row.get(col1, 0)
+                if col2 == "next_column":
+                    # Get the next column after col1
+                    try:
+                        col1_idx = row.index.get_loc(col1)
+                        v2 = row.iloc[col1_idx + 1] if col1_idx + 1 < len(row) else 0
+                    except:
+                        v2 = 0
+                elif col2 == "prev_column":
+                    # Get the previous column before col1
+                    try:
+                        col1_idx = row.index.get_loc(col1)
+                        v2 = row.iloc[col1_idx - 1] if col1_idx - 1 >= 0 else 0
+                    except:
+                        v2 = 0
+                else:
+                    v2 = row.get(col2, 0)
+                deductions.append(f"{display_name:15}{v1:>12,.2f}{v2:>12,.2f}")
+        else:
+            # Single column
+            if excel_header in row:
+                v = row.get(excel_header, 0)
+                deductions.append(f"{display_name:15}{v:>12,.2f}")
+    
+    return deductions
+
 def generate_fixed_payslip(row):
     """Generate a payslip for FIXED April sheet."""
     width = 100
@@ -155,57 +227,9 @@ def generate_fixed_payslip(row):
         f"\n\n{'EARNINGS'.ljust(headerWidth // 2)}{'DEDUCTIONS'.ljust(headerWidth // 2)}\n"
     )
 
-    # List of earnings
-    earnings = [
-        f"{'BASIC SAL':<20}{row['BASIC SAL']:>11,.2f}",
-        f"{'B.R ALLOWA':<20}{row['B.R ALLOWA']:>11,.2f}",
-        f"{'MEDICAL':<20}{row['MEDICAL']:>11,.2f}",
-        f"{'ACTING AL':<20}{row['ACTING AL2']:>11,.2f}",
-        f"{'INCENTIVE':<20}{row['INCENTIVE']:>11,.2f}",
-        f"{'SHIFT ALLO':<20}{row['SHIFT ALLO']:>11,.2f}",
-        f"{'DISCRETIONARY INC':<20}{row['Dis cre- Fuel']:>11,.2f}",
-        f"{'NORMAL OT':<20}{row['NORMAL OT']:>11,.2f} {row[row.index[row.index.get_loc('NORMAL OT') + 1]]:>5,.2f}",
-        f"{'TRIPPLE OT':<20}{row['TRIPPLE OT']:>11,.2f} {row[row.index[row.index.get_loc('TRIPPLE OT') + 1]]:>5,.2f}",
-        f"{'DOUBBLE OT':<20}{row['DOUBBLE OT']:>11,.2f} {row[row.index[row.index.get_loc('DOUBBLE OT') + 1]]:>5,.2f}",
-        f"{'FIRST AID':<20}{row['FIRST AID']:>11,.2f}",
-        f"{'FIRE TEAM':<20}{row['FIRE TEAM']:>11,.2f}",
-        f"{'RELOCATION':<20}{row['RELOCATION']:>11,.2f}",
-        f"{'SOSU ALLOW':<20}{row['SOSU ALLOW']:>11,.2f}",
-        f"{'NO PAY COR':<20}{row['NO PAY COR']:>11,.2f}",
-        f"{'APPLAUSE PAYMENT':<20}{row['APPLAUSE PAYMENT']:>11,.2f}",
-        f"{'FE NIG SHI':<20}{row['FE NIG SHI']:>11,.2f}",
-        f"{'BALANCE LEAVE':<20}{row['BALANCE LEAVE']:>11,.2f}",
-        f"{'SPEC SOSU':<20}{row['SPEC SOSU']:>11,.2f}",
-        f"{'TAX REFUD':<20}{row['Tax Refund']:>11,.2f}",
-        f"{'SUNDAY WAGES FOR EPF':<20}{row['Sunday Wages']:>11,.2f}",
-        f"{'ARREARS DOUBLE OT':<20}{row['Arrears Double OT']:>11,.2f} {row[row.index[row.index.get_loc('Arrears Double OT') + 1]]:>5,.2f}",
-        f"{'ARREARS TRIPLE OT':<20}{row['Arrears Triple OT']:>11,.2f} {row[row.index[row.index.get_loc('Arrears Triple OT') + 1]]:>5,.2f}",
-        f"{'ARREARS NORMAL OT':<20}{row['Arrears NOT']:>11,.2f} {row[row.index[row.index.get_loc('Arrears NOT') + 1]]:>5,.2f}",
-    ]
-
-    # List of deductions
-    deductions = [
-        f"{'EPF YEE':15}{row['EPF YEE']:>12,.2f}",
-        f"{'NO PAY':15}{row['NO PAY']:>12,.2f}{row[row.index[row.index.get_loc('NO PAY') + 1]]:>12,.2f}",
-        f"{'LATE MINUTE':15}{row['Late Minute']:>12,.2f}{row[row.index[row.index.get_loc('Late Minute') + 1]]:>12,.2f}",
-        # f"{'WELFARE':15}{row['WELFARE']:>12,.2f}",
-        f"{'SPORTS CLU':15}{row['SPORTS CLU']:>12,.2f}",
-        f"{'FAIR FIRST':15}{row['FAIR FIRST']:>12,.2f}",
-        f"{'UNION ICE':15}{row['UNION ICE']:>12,.2f}",
-        f"{'FES ADVANC':15}{row['FES ADVANC']:>12,.2f}{row[row.index[row.index.get_loc('FES ADVANC') + 1]]:>12,.2f}",
-        f"{'FESTIVAL ADVANC':15}{row['Festival Advance']:>12,.2f}{row[row.index[row.index.get_loc('Festival Advance') + 1]]:>12,.2f}",
-        f"{'MOTOR CYCL':15}{row['MOTOR CYCL']:>12,.2f}{row[row.index[row.index.get_loc('MOTOR CYCL') + 1]]:>12,.2f}",
-        f"{'MOTOR CINT':15}{row['MOTOR CINT']:>12,.2f}{row[row.index[row.index.get_loc('MOTOR CINT') + 1]]:>12,.2f}",
-        f"{'PLDC SAMP: CON':15}{row['P.L.D.C.Sampath']:>12,.2f}",
-        f"{'APIT TAX':15}{row['APIT TAX']:>12,.2f}",
-        f"{'SALARY OVER PAY':15}{row['Salary Over Payment']:>12,.2f}",
-        f"{'WIJAYARADI HIRE':15}{row['WIJAYA RADIO']:>12,.2f}{row[row.index[row.index.get_loc('WIJAYA RADIO') + 1]]:>12,.2f}",
-        f"{'HIREPUR SINGER':15}{row['Singer']:>12,.2f}{row[row.index[row.index.get_loc('Singer') + 1]]:>12,.2f}",
-        # f"{'EDUCATIONAL ASSISTANT':15}{row['EDUCATIONAL ASSISTANT']:>12,.2f}{row[row.index[row.index.get_loc('EDUCATIONAL ASSISTANT') + 1]]:>12,.2f}",
-        f"{'MOCY GURANTER':15}{row['MOCY GURANTER']:>12,.2f}",
-        f"{'MOCY GURA INT':15}{row['MOCY GURANTER INT']:>12,.2f}",
-    ]
-
+    # Generate earnings and deductions from config instead of hardcoded lists
+    earnings = generate_earnings_from_config(row, 'FIXED')
+    deductions = generate_deductions_from_config(row, 'FIXED')
 
     # Filter out 0.00 or blank values
     earnings = filter_payslip_item(earnings)
@@ -257,46 +281,9 @@ def generate_ftc_payslip(row):
         f"\n\n{'EARNINGS'.ljust(headerWidth // 2)}{' DEDUCTIONS'.ljust(headerWidth // 2)}\n"
     )
 
-    # Update earnings format to match fixed payslip
-    earnings = [
-        f"{'B.R ALLOWA':<20}{row.get('B.R ALLOWA', 0):>12,.2f}",
-        f"{'BASIC SAL':<20}{row.get('BASIC SAL', 0):>12,.2f}",
-        f"{'MEDICAL':<20}{row.get('MEDICAL', 0):>12,.2f}",
-        f"{'ACTING AL':<20}{row.get('ACTING AL2', 0):>12,.2f}",
-        f"{'INCENTIVE':<20}{row.get('INCENTIVE', 0):>12,.2f}",
-        f"{'SHIFT ALLO':<20}{row.get('SHIFT ALLO', 0):>12,.2f}",
-        f"{'NORMAL OT':<20}{row.get('NORMAL OT', 0):>12,.2f}{row[row.index[row.index.get_loc('NORMAL OT') + 1]]:>7,.2f}",
-        f"{'TRIPPLE OT':<20}{row.get('TRIPPLE OT', 0):>12,.2f}{row[row.index[row.index.get_loc('TRIPLE OT') + 1]]:>7,.2f}",
-        f"{'DOUBBLE OT':<20}{row.get('DOUBBLE OT', 0):>12,.2f}{row[row.index[row.index.get_loc('DOUBBLE OT') + 1]]:>7,.2f}",
-        f"{'FIRST AID':<20}{row.get('FIRST AID', 0):>12,.2f}",
-        f"{'FIRE TEAM':<20}{row.get('FIRE TEAM', 0):>12,.2f}",
-        f"{'RELOCATION':<20}{row.get('RELOCATION', 0):>12,.2f}",
-        f"{'SOSU ALLOW':<20}{row.get('SOSU ALLOW', 0):>12,.2f}",
-        f"{'SUNDAY WAGES FOR EPF':<20}{row.get('SUNDAY WAGES FOR EPF', 0):>12,.2f}",
-        f"{'ARREARS NORMAL OT':<20}{row.get('Arrears Normal OT', 0):>12,.2f}{row[row.index[row.index.get_loc('Arrears Normal OT') + 1]]:>5,.2f}",
-        f"{'ARREARS DOUBLE OT':<20}{row.get('Arrears Double OT', 0):>12,.2f}{row[row.index[row.index.get_loc('Arrears Double OT') + 1]]:>5,.2f}",
-        f"{'ARREARS SHIFT ALLOWANCE':<20}{row.get('Shift allowance arrears', 0):>12,.2f}",
-    ]
-
-    # Update deductions format to match fixed payslip
-    deductions = [
-        f"{'EPF YEE':15}{row.get('EPF YEE', 0):>12,.2f}",
-        f"{'LATE MINUTE':15}{row['LATE MINUTES DEDUCTION']:>12,.2f}  {row[row.index[row.index.get_loc('LATE MINUTES DEDUCTION') - 1]]:>5,.2f}",
-        f"{'NO PAY':15}{row.get('NO PAY', 0):>12,.2f}",
-        f"{'WELFARE':15}{row.get('WELFARE', 0):>12,.2f}",
-        f"{'SPORTS CLU':15}{row.get('SPORTS CLU', 0):>12,.2f}",
-        f"{'FAIR FIRST':15}{row.get('FAIR FIRST', 0):>12,.2f}",
-        f"{'UNION ICE':15}{row.get('UNION ICE', 0):>12,.2f}",
-        f"{'FES ADVANC':15}{row.get('FES ADVANC', 0):>12,.2f}",
-        f"{'MOTOR CYCL':15}{row.get('MOTOR CYCL', 0):>12,.2f}",
-        f"{'MOTOR CINT':15}{row.get('MOTOR CINT', 0):>12,.2f}",
-        f"{'P.L.D.C.Sampath':15}{row.get('P.L.D.C.Sampath', 0):>12,.2f}",
-        f"{'APIT TAX':15}{row.get('APIT TAX', 0):>12,.2f}",
-        f"{'WIJAYA RADIO':15}{row.get('WIJAYA RADIO', 0):>12,.2f}",
-        # f"{'EDUCATIONAL ASSISTANT':15}{row.get('EDUCATIONAL ASSISTANT', 0):>12,.2f}",
-        f"{'FOOT CYCLE LOAN':15}{row.get('FOOT CYCLE LOAN', 0):>12,.2f}",
-        f"{'Singer':15}{row.get('Singer', 0):>12,.2f}",
-    ]
+    # Generate earnings and deductions from config instead of hardcoded lists
+    earnings = generate_earnings_from_config(row, 'FTC')
+    deductions = generate_deductions_from_config(row, 'FTC')
 
     # Filter out 0.00 or blank values
     earnings = filter_payslip_item(earnings)
