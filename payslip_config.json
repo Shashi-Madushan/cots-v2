@@ -8,9 +8,18 @@
             "INCENTIVE": "INCENTIVE",
             "SHIFT ALLO": "SHIFT ALLO",
             "DISCRETIONARY INC": "Dis cre- Fuel",
-            "NORMAL OT": ["NORMAL OT", "next_column"],
-            "TRIPPLE OT": ["TRIPPLE OT", "next_column"],
-            "DOUBBLE OT": ["DOUBBLE OT", "next_column"],
+            "NORMAL OT": [
+                "NORMAL OT",
+                "next_column"
+            ],
+            "TRIPPLE OT": [
+                "TRIPPLE OT",
+                "next_column"
+            ],
+            "DOUBBLE OT": [
+                "DOUBBLE OT",
+                "next_column"
+            ],
             "FIRST AID": "FIRST AID",
             "FIRE TEAM": "FIRE TEAM",
             "RELOCATION": "RELOCATION",
@@ -22,26 +31,59 @@
             "SPEC SOSU": "SPEC SOSU",
             "TAX REFUD": "Tax Refund",
             "SUNDAY WAGES FOR EPF": "Sunday Wages",
-            "ARREARS DOUBLE OT": ["Arrears Double OT", "next_column"],
-            "ARREARS TRIPLE OT": ["Arrears Triple OT", "next_column"],
-            "ARREARS NORMAL OT": ["Arrears NOT", "next_column"]
+            "ARREARS DOUBLE OT": [
+                "Arrears Double OT",
+                "next_column"
+            ],
+            "ARREARS TRIPLE OT": [
+                "Arrears Triple OT",
+                "next_column"
+            ],
+            "ARREARS NORMAL OT": [
+                "Arrears NOT",
+                "next_column"
+            ]
         },
         "deductions": {
             "EPF YEE": "EPF YEE",
-            "NO PAY": ["NO PAY", "next_column"],
-            "LATE MINUTE": ["Late Minute", "next_column"],
+            "NO PAY": [
+                "NO PAY",
+                "next_column"
+            ],
+            "LATE MINUTE": [
+                "Late Minute",
+                "next_column"
+            ],
             "SPORTS CLU": "SPORTS CLU",
             "FAIR FIRST": "FAIR FIRST",
             "UNION ICE": "UNION ICE",
-            "FES ADVANC": ["FES ADVANC", "next_column"],
-            "FESTIVAL ADVANC": ["Festival Advance", "next_column"],
-            "MOTOR CYCL": ["MOTOR CYCL", "next_column"],
-            "MOTOR CINT": ["MOTOR CINT", "next_column"],
+            "FES ADVANC": [
+                "FES ADVANC",
+                "next_column"
+            ],
+            "FESTIVAL ADVANC": [
+                "Festival Advance",
+                "next_column"
+            ],
+            "MOTOR CYCL": [
+                "MOTOR CYCL",
+                "next_column"
+            ],
+            "MOTOR CINT": [
+                "MOTOR CINT",
+                "next_column"
+            ],
             "PLDC SAMP: CON": "P.L.D.C.Sampath",
             "APIT TAX": "APIT TAX",
             "SALARY OVER PAY": "Salary Over Payment",
-            "WIJAYARADI HIRE": ["WIJAYA RADIO", "next_column"],
-            "HIREPUR SINGER": ["Singer", "next_column"],
+            "WIJAYARADI HIRE": [
+                "WIJAYA RADIO",
+                "next_column"
+            ],
+            "HIREPUR SINGER": [
+                "Singer",
+                "next_column"
+            ],
             "MOCY GURANTER": "MOCY GURANTER",
             "MOCY GURA INT": "MOCY GURANTER INT"
         }
@@ -54,21 +96,39 @@
             "ACTING AL": "ACTING AL2",
             "INCENTIVE": "INCENTIVE",
             "SHIFT ALLO": "SHIFT ALLO",
-            "NORMAL OT": ["NORMAL OT", "next_column"],
-            "TRIPPLE OT": ["TRIPPLE OT", "next_column"],
-            "DOUBBLE OT": ["DOUBBLE OT", "next_column"],
+            "NORMAL OT": [
+                "NORMAL OT",
+                "next_column"
+            ],
+            "TRIPPLE OT": [
+                "TRIPPLE OT",
+                "next_column"
+            ],
+            "DOUBBLE OT": [
+                "DOUBBLE OT",
+                "next_column"
+            ],
             "FIRST AID": "FIRST AID",
             "FIRE TEAM": "FIRE TEAM",
             "RELOCATION": "RELOCATION",
             "SOSU ALLOW": "SOSU ALLOW",
             "SUNDAY WAGES FOR EPF": "SUNDAY WAGES FOR EPF",
-            "ARREARS NORMAL OT": ["Arrears Normal OT", "next_column"],
-            "ARREARS DOUBLE OT": ["Arrears Double OT", "next_column"],
+            "ARREARS NORMAL OT": [
+                "Arrears Normal OT",
+                "next_column"
+            ],
+            "ARREARS DOUBLE OT": [
+                "Arrears Double OT",
+                "next_column"
+            ],
             "ARREARS SHIFT ALLOWANCE": "Shift allowance arrears"
         },
         "deductions": {
             "EPF YEE": "EPF YEE",
-            "LATE MINUTE": ["LATE MINUTES DEDUCTION", "prev_column"],
+            "LATE MINUTE": [
+                "LATE MINUTES DEDUCTION",
+                "prev_column"
+            ],
             "NO PAY": "NO PAY",
             "WELFARE": "WELFARE",
             "SPORTS CLU": "SPORTS CLU",

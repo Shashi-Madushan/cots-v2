@@ -8,9 +8,10 @@ from print_manager import PayslipPrintManager  # Changed to PayslipPrintManager
 from PyQt5.QtWidgets import (
    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
    QFileDialog, QLabel, QListWidget, QTableWidget, QTableWidgetItem, QSplitter,
-   QMessageBox, QTextEdit, QDialog, QComboBox, QLineEdit
+   QMessageBox, QTextEdit, QDialog, QComboBox, QLineEdit, QListWidgetItem
 )
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPalette
 from config import PayslipConfig
 
 
@@ -593,27 +594,45 @@ class ConfigDialog(QDialog):
         self.excel_header2_label.hide()
         self.excel_header2.hide()
 
-
-        # Add mapping button
-        add_button = QPushButton("Add Mapping")
-        add_button.clicked.connect(self.add_mapping)
-        layout.addWidget(add_button)
-
+        # Track editing state (initialize before update_mappings_list)
+        self.editing_mapping = None  # Will store the original mapping being edited
 
         # Current mappings list
         self.mappings_status_label = QLabel()
         layout.addWidget(self.mappings_status_label)
         
         self.mappings_list = QListWidget()
+        self.mappings_list.itemDoubleClicked.connect(self.edit_mapping)
         self.update_mappings_list()
         layout.addWidget(self.mappings_list)
 
+        # Instruction label for editing
+        edit_instruction = QLabel("💡 Tip: Double-click any mapping to edit it | Click and drag to reorder")
+        edit_instruction.setStyleSheet("color: #666; font-style: italic; font-size: 11px;")
+        layout.addWidget(edit_instruction)
+
+        # Button container for add/update and remove
+        button_container = QWidget()
+        button_layout = QHBoxLayout()
+        button_container.setLayout(button_layout)
+
+        # Add/Update mapping button (dynamic text)
+        self.add_update_button = QPushButton("Add Mapping")
+        self.add_update_button.clicked.connect(self.add_or_update_mapping)
+        button_layout.addWidget(self.add_update_button)
+
+        # Cancel edit button (hidden by default)
+        self.cancel_edit_button = QPushButton("Cancel Edit")
+        self.cancel_edit_button.clicked.connect(self.cancel_edit)
+        self.cancel_edit_button.hide()
+        button_layout.addWidget(self.cancel_edit_button)
 
         # Remove mapping button
         remove_button = QPushButton("Remove Selected")
         remove_button.clicked.connect(self.remove_mapping)
-        layout.addWidget(remove_button)
+        button_layout.addWidget(remove_button)
 
+        layout.addWidget(button_container)
 
         self.setLayout(layout)
 
@@ -630,6 +649,14 @@ class ConfigDialog(QDialog):
 
     def update_mappings_list(self):
         """Update the mappings list based on current sheet type and mapping type selection"""
+        # Cancel edit mode if changing sheet type or mapping type
+        if self.editing_mapping:
+            current_sheet = self.sheet_type.currentText()
+            current_mapping = self.mapping_type.currentText()
+            if (self.editing_mapping['sheet_type'] != current_sheet or 
+                self.editing_mapping['mapping_type'] != current_mapping):
+                self.cancel_edit()
+        
         self.mappings_list.clear()
         sheet_type = self.sheet_type.currentText()
         mapping_type = self.mapping_type.currentText()
@@ -641,7 +668,10 @@ class ConfigDialog(QDialog):
         mappings = self.config.get_mappings(sheet_type)[mapping_type]
         
         if not mappings:
-            self.mappings_list.addItem("No mappings configured for this combination")
+            item_text = "No mappings configured for this combination"
+            item = QListWidgetItem(item_text)
+            item.setForeground(QApplication.palette().color(QPalette.Text))
+            self.mappings_list.addItem(item)
             return
         
         for display_name, excel_header in mappings.items():
@@ -652,45 +682,17 @@ class ConfigDialog(QDialog):
             else:
                 item_text = f"{display_name} → {excel_header}"
             
-            self.mappings_list.addItem(item_text)
-
-
-    def add_mapping(self):
-        mapping_format = self.mapping_format.currentText()
-        sheet_type = self.sheet_type.currentText()
-        mapping_type = self.mapping_type.currentText()
-        dn1 = self.display_name1.text().strip()
-        col1 = self.excel_header1.currentText().strip()
-        col2 = self.excel_header2.currentText().strip()
-        
-        if mapping_format == "Double Column":
-            if dn1 and col1 and col2:
-                display_name = dn1
-                excel_header = [col1, col2]
-            else:
-                QMessageBox.warning(self, "Incomplete Data", "Please fill in display name and both column names for double column mapping.")
-                return
-        else:
-            if dn1 and col1:
-                display_name = dn1
-                excel_header = col1
-            else:
-                QMessageBox.warning(self, "Incomplete Data", "Please fill in display name and column name for single column mapping.")
-                return
-        
-        # Add the mapping
-        self.config.add_mapping(sheet_type, mapping_type, display_name, excel_header)
-        
-        # Update the list to show the new mapping
-        self.update_mappings_list()
-        
-        # Clear input fields
-        self.display_name1.clear()
-        self.excel_header1.setCurrentIndex(0)
-        self.excel_header2.setCurrentIndex(0)
-        
-        # Show success message
-        QMessageBox.information(self, "Success", f"Mapping '{display_name}' has been added to {sheet_type} {mapping_type}.")
+            item = QListWidgetItem(item_text)
+            
+            # Highlight the item being edited
+            if (self.editing_mapping and 
+                self.editing_mapping['display_name'] == display_name and
+                self.editing_mapping['sheet_type'] == sheet_type and
+                self.editing_mapping['mapping_type'] == mapping_type):
+                item.setBackground(QApplication.palette().color(QPalette.Highlight))
+                item.setForeground(QApplication.palette().color(QPalette.HighlightedText))
+            
+            self.mappings_list.addItem(item)
 
 
     def remove_mapping(self):
@@ -711,27 +713,184 @@ class ConfigDialog(QDialog):
                 sheet_type = self.sheet_type.currentText()
                 mapping_type = self.mapping_type.currentText()
                 
-                # Confirm deletion
-                reply = QMessageBox.question(self, "Confirm Removal", 
-                                           f"Are you sure you want to remove the mapping '{display_name}'?",
-                                           QMessageBox.Yes | QMessageBox.No, 
-                                           QMessageBox.No)
+                # Check if we're trying to remove the mapping being edited
+                if (self.editing_mapping and 
+                    self.editing_mapping['display_name'] == display_name and
+                    self.editing_mapping['sheet_type'] == sheet_type and
+                    self.editing_mapping['mapping_type'] == mapping_type):
+                    
+                    reply = QMessageBox.question(self, "Remove Edited Mapping", 
+                                               f"You are currently editing '{display_name}'.\n"
+                                               f"Do you want to remove it instead?",
+                                               QMessageBox.Yes | QMessageBox.No, 
+                                               QMessageBox.No)
+                    if reply == QMessageBox.No:
+                        return
+                    
+                    # Cancel edit mode first
+                    self.cancel_edit()
+                else:
+                    # Normal confirmation for non-edited mappings
+                    reply = QMessageBox.question(self, "Confirm Removal", 
+                                               f"Are you sure you want to remove the mapping '{display_name}'?",
+                                               QMessageBox.Yes | QMessageBox.No, 
+                                               QMessageBox.No)
+                    
+                    if reply == QMessageBox.No:
+                        return
                 
-                if reply == QMessageBox.Yes:
-                    # Remove the mapping using the display name as key
-                    self.config.remove_mapping(sheet_type, mapping_type, display_name)
-                    
-                    # Update the list to reflect the change
-                    self.update_mappings_list()
-                    
-                    # Show success message
-                    QMessageBox.information(self, "Success", f"Mapping '{display_name}' has been removed.")
+                # Remove the mapping using the display name as key
+                self.config.remove_mapping(sheet_type, mapping_type, display_name)
+                
+                # Update the list to reflect the change
+                self.update_mappings_list()
+                
+                # Show success message
+                QMessageBox.information(self, "Success", f"Mapping '{display_name}' has been removed.")
             else:
                 QMessageBox.warning(self, "Error", "Invalid mapping format selected.")
         else:
             QMessageBox.information(self, "No Selection", "Please select a mapping to remove.")
 
 
+    def edit_mapping(self, item):
+        """Handle double-click on a mapping item to edit it"""
+        text = item.text()
+        
+        # Check if this is the "No mappings" message
+        if text.startswith("No mappings configured"):
+            return
+        
+        # Parse the display text to extract mapping information
+        if ' → ' not in text:
+            return
+            
+        display_name = text.split(' → ')[0].strip()
+        excel_header_part = text.split(' → ')[1].strip()
+        
+        # Get the current sheet type and mapping type
+        sheet_type = self.sheet_type.currentText()
+        mapping_type = self.mapping_type.currentText()
+        
+        # Get the actual mapping from config
+        mappings = self.config.get_mappings(sheet_type)[mapping_type]
+        if display_name not in mappings:
+            QMessageBox.warning(self, "Error", "Could not find mapping in configuration.")
+            return
+            
+        excel_header = mappings[display_name]
+        
+        # Enter edit mode
+        self.editing_mapping = {
+            'display_name': display_name,
+            'excel_header': excel_header,
+            'sheet_type': sheet_type,
+            'mapping_type': mapping_type
+        }
+        
+        # Populate the input fields
+        self.display_name1.setText(display_name)
+        
+        # Handle single vs double column
+        if isinstance(excel_header, (list, tuple)) and len(excel_header) == 2:
+            # Double column mapping
+            self.mapping_format.setCurrentText("Double Column")
+            self.excel_header1.setCurrentText(excel_header[0])
+            self.excel_header2.setCurrentText(excel_header[1])
+        else:
+            # Single column mapping
+            self.mapping_format.setCurrentText("Single Column")
+            self.excel_header1.setCurrentText(str(excel_header))
+            self.excel_header2.setCurrentText("")
+        
+        # Update UI for edit mode
+        self.add_update_button.setText("Update Mapping")
+        self.cancel_edit_button.show()
+        
+        # Highlight the item being edited
+        item.setSelected(True)
+        
+        # Show info message
+        QMessageBox.information(self, "Edit Mode", 
+                              f"Now editing: {display_name}\n"
+                              f"Make your changes and click 'Update Mapping' to save.")
+
+    def cancel_edit(self):
+        """Cancel the current edit operation"""
+        self.editing_mapping = None
+        self.add_update_button.setText("Add Mapping")
+        self.cancel_edit_button.hide()
+        
+        # Clear input fields
+        self.display_name1.clear()
+        self.excel_header1.setCurrentIndex(0)
+        self.excel_header2.setCurrentIndex(0)
+        self.mapping_format.setCurrentText("Single Column")
+        
+        # Clear selection
+        self.mappings_list.clearSelection()
+
+    def add_or_update_mapping(self):
+        """Add new mapping or update existing one based on current mode"""
+        mapping_format = self.mapping_format.currentText()
+        sheet_type = self.sheet_type.currentText()
+        mapping_type = self.mapping_type.currentText()
+        dn1 = self.display_name1.text().strip()
+        col1 = self.excel_header1.currentText().strip()
+        col2 = self.excel_header2.currentText().strip()
+        
+        # Validate input
+        if mapping_format == "Double Column":
+            if not (dn1 and col1 and col2):
+                QMessageBox.warning(self, "Incomplete Data", 
+                                  "Please fill in display name and both column names for double column mapping.")
+                return
+            excel_header = [col1, col2]
+        else:
+            if not (dn1 and col1):
+                QMessageBox.warning(self, "Incomplete Data", 
+                                  "Please fill in display name and column name for single column mapping.")
+                return
+            excel_header = col1
+        
+        if self.editing_mapping:
+            # Update existing mapping
+            old_display_name = self.editing_mapping['display_name']
+            old_sheet_type = self.editing_mapping['sheet_type']
+            old_mapping_type = self.editing_mapping['mapping_type']
+            
+            # If the key (display_name, sheet_type, or mapping_type) changed, remove old mapping
+            if (old_display_name != dn1 or 
+                old_sheet_type != sheet_type or 
+                old_mapping_type != mapping_type):
+                self.config.remove_mapping(old_sheet_type, old_mapping_type, old_display_name)
+            
+            # Add the updated mapping
+            self.config.add_mapping(sheet_type, mapping_type, dn1, excel_header)
+            
+            # Exit edit mode
+            self.cancel_edit()
+            
+            # Show success message
+            QMessageBox.information(self, "Success", 
+                                  f"Mapping '{dn1}' has been updated successfully!")
+        else:
+            # Add new mapping
+            self.config.add_mapping(sheet_type, mapping_type, dn1, excel_header)
+            
+            # Clear input fields
+            self.display_name1.clear()
+            self.excel_header1.setCurrentIndex(0)
+            self.excel_header2.setCurrentIndex(0)
+            
+            # Show success message
+            QMessageBox.information(self, "Success", 
+                                  f"Mapping '{dn1}' has been added to {sheet_type} {mapping_type}.")
+        
+        # Update the list to show changes
+        self.update_mappings_list()
+
+    # ...existing code...
 def main():
    app = QApplication(sys.argv)
    window = ExcelSheetViewer()
