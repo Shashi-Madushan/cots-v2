@@ -890,7 +890,6 @@ class ConfigDialog(QDialog):
         # Update the list to show changes
         self.update_mappings_list()
 
-    # ...existing code...
 def main():
    app = QApplication(sys.argv)
    window = ExcelSheetViewer()
