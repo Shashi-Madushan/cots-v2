@@ -284,10 +284,7 @@ def generate_fixed_payslip(row):
     earnings = generate_earnings_from_config(row, 'FIXED')
     deductions = generate_deductions_from_config(row, 'FIXED')
 
-    # Add custom mapped entries (now includes filtering at source)
-    add_custom_entries(earnings, deductions, row, 'FIXED')
-    
-    # Additional filtering as safety net (should be minimal now)
+    # Additional filtering as safety net
     earnings = filter_payslip_item(earnings)
     deductions = filter_payslip_item(deductions)
     # Format side-by-side layout
@@ -338,10 +335,7 @@ def generate_ftc_payslip(row):
     earnings = generate_earnings_from_config(row, 'FTC')
     deductions = generate_deductions_from_config(row, 'FTC')
 
-    # Add custom mapped entries (now includes filtering at source)
-    add_custom_entries(earnings, deductions, row, 'FTC')
-    
-    # Additional filtering as safety net (should be minimal now)
+    # Additional filtering as safety net
     earnings = filter_payslip_item(earnings)
     deductions = filter_payslip_item(deductions)
     # Use the same combine_lines function as fixed payslip
