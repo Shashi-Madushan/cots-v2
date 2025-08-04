@@ -163,6 +163,39 @@ class ExcelSheetViewer(QMainWindow):
        self.layout.addWidget(bottom_container)
 
 
+       # Month selector (add after file selection buttons)
+       month_container = QWidget()
+       month_layout = QHBoxLayout()
+       month_container.setLayout(month_layout)
+        
+       month_layout.addWidget(QLabel("Payslip Month:"))
+       self.month_selector = QComboBox()
+       current_year = datetime.now().year
+       months = [f"{m.upper()} {y}" for y in [current_year-1, current_year, current_year+1] 
+                for m in ["January", "February", "March", "April", "May", "June", 
+                         "July", "August", "September", "October", "November", "December"]]
+       self.month_selector.addItems(months)
+        
+       # Set current month
+       current_month = datetime.now().strftime('%B %Y').upper()
+       current_idx = self.month_selector.findText(current_month)
+       if current_idx >= 0:
+           self.month_selector.setCurrentIndex(current_idx)
+            
+       # Load saved month if exists
+       config = PayslipConfig()
+       saved_month = config.get_payslip_month()
+       if saved_month:
+           saved_idx = self.month_selector.findText(saved_month)
+           if saved_idx >= 0:
+               self.month_selector.setCurrentIndex(saved_idx)
+        
+       self.month_selector.currentTextChanged.connect(self.on_month_changed)
+       month_layout.addWidget(self.month_selector)
+        
+       self.layout.addWidget(month_container)
+
+
        self.selected_file = None
        self.current_df = None
        self.current_headers = []  # Add this line after self.current_df initialization
@@ -520,6 +553,14 @@ class ExcelSheetViewer(QMainWindow):
    def show_config_dialog(self):
        dialog = ConfigDialog(self, self.current_headers)
        dialog.exec_()
+
+
+   def on_month_changed(self, month):
+        """Save selected month to config"""
+        config = PayslipConfig()
+        config.set_payslip_month(month)
+        # Update any visible payslips
+        self.on_row_selection_changed()
 
 
 class ConfigDialog(QDialog):

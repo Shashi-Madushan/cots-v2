@@ -24,7 +24,8 @@ class PayslipConfig:
             'FTC': {
                 'earnings': {},
                 'deductions': {}
-            }
+            },
+            'payslip_month': None  # Add default month setting
         }
 
     def save_config(self):
@@ -57,3 +58,12 @@ class PayslipConfig:
     def get_mappings(self, sheet_type):
         """Get all mappings for a sheet type"""
         return self.config.get(sheet_type, {'earnings': {}, 'deductions': {}})
+
+    def set_payslip_month(self, month):
+        """Set the payslip month"""
+        self.config['payslip_month'] = month
+        self.save_config()
+
+    def get_payslip_month(self):
+        """Get the current payslip month"""
+        return self.config.get('payslip_month', None)
