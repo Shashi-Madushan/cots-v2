@@ -163,6 +163,39 @@ class ExcelSheetViewer(QMainWindow):
        self.layout.addWidget(bottom_container)
 
 
+       # Month selector (add after file selection buttons)
+       month_container = QWidget()
+       month_layout = QHBoxLayout()
+       month_container.setLayout(month_layout)
+        
+       month_layout.addWidget(QLabel("Payslip Month:"))
+       self.month_selector = QComboBox()
+       current_year = datetime.now().year
+       months = [f"{m.upper()} {y}" for y in [current_year-1, current_year, current_year+1] 
+                for m in ["January", "February", "March", "April", "May", "June", 
+                         "July", "August", "September", "October", "November", "December"]]
+       self.month_selector.addItems(months)
+        
+       # Set current month
+       current_month = datetime.now().strftime('%B %Y').upper()
+       current_idx = self.month_selector.findText(current_month)
+       if current_idx >= 0:
+           self.month_selector.setCurrentIndex(current_idx)
+            
+       # Load saved month if exists
+       config = PayslipConfig()
+       saved_month = config.get_payslip_month()
+       if saved_month:
+           saved_idx = self.month_selector.findText(saved_month)
+           if saved_idx >= 0:
+               self.month_selector.setCurrentIndex(saved_idx)
+        
+       self.month_selector.currentTextChanged.connect(self.on_month_changed)
+       month_layout.addWidget(self.month_selector)
+        
+       self.layout.addWidget(month_container)
+
+
        self.selected_file = None
        self.current_df = None
        self.current_headers = []  # Add this line after self.current_df initialization
@@ -287,12 +320,30 @@ class ExcelSheetViewer(QMainWindow):
 
 
    def on_row_selection_changed(self):
-       # Enable/disable payslip and print buttons based on row selection
-       selected_rows = self.data_table.selectedItems()
-       has_selection = len(selected_rows) > 0
+       """Handle row selection and generate payslip preview"""
+       selected_items = self.data_table.selectedItems()
+       has_selection = len(selected_items) > 0
        self.generate_payslip_button.setEnabled(has_selection)
        self.print_selected_button.setEnabled(has_selection)
-       self.print_selected_button.setEnabled(len(selected_rows) > 0)
+
+       # Generate preview when row is selected
+       if has_selection and self.current_df is not None:
+           try:
+               # Get selected row index
+               row_index = selected_items[0].row()
+               # Get row data as Series
+               row_data = self.current_df.iloc[row_index]
+               # Get current sheet name
+               current_sheet = self.sheet_list.currentItem().text()
+               # Generate payslip
+               payslip = generate_payslip(row_data, current_sheet)
+               # Update preview
+               self.payslip_preview.setText(payslip)
+           except Exception as e:
+               logger.error(f"Error generating preview: {str(e)}")
+               self.payslip_preview.setText("Error generating preview")
+       else:
+           self.payslip_preview.clear()
 
 
    def generate_selected_payslip(self):
@@ -520,6 +571,14 @@ class ExcelSheetViewer(QMainWindow):
    def show_config_dialog(self):
        dialog = ConfigDialog(self, self.current_headers)
        dialog.exec_()
+
+
+   def on_month_changed(self, month):
+        """Save selected month to config"""
+        config = PayslipConfig()
+        config.set_payslip_month(month)
+        # Update any visible payslips
+        self.on_row_selection_changed()
 
 
 class ConfigDialog(QDialog):
