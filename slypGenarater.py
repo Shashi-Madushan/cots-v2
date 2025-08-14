@@ -146,11 +146,9 @@ def add_custom_entries(earnings, deductions, row, sheet_type):
                     deductions.append(f"{display_name:15}{safe_fmt(v,12)}")
 
 def get_payslip_month_year():
-    """Return the payslip month and year string, e.g., 'MAY 2025'."""
-    now = datetime.now()
-    month_str = now.strftime('%B').upper()
-    year_str = now.strftime('%Y')
-    return f"{month_str} {year_str}"
+    """Return the configured payslip month and year string."""
+    config = PayslipConfig()
+    return config.get_payslip_month() or datetime.now().strftime('%B %Y').upper()
 
 def generate_earnings_from_config(row, sheet_type):
     """Generate earnings list from configuration"""
@@ -286,10 +284,7 @@ def generate_fixed_payslip(row):
     earnings = generate_earnings_from_config(row, 'FIXED')
     deductions = generate_deductions_from_config(row, 'FIXED')
 
-    # Add custom mapped entries (now includes filtering at source)
-    add_custom_entries(earnings, deductions, row, 'FIXED')
-    
-    # Additional filtering as safety net (should be minimal now)
+    # Additional filtering as safety net
     earnings = filter_payslip_item(earnings)
     deductions = filter_payslip_item(deductions)
     # Format side-by-side layout
@@ -340,10 +335,7 @@ def generate_ftc_payslip(row):
     earnings = generate_earnings_from_config(row, 'FTC')
     deductions = generate_deductions_from_config(row, 'FTC')
 
-    # Add custom mapped entries (now includes filtering at source)
-    add_custom_entries(earnings, deductions, row, 'FTC')
-    
-    # Additional filtering as safety net (should be minimal now)
+    # Additional filtering as safety net
     earnings = filter_payslip_item(earnings)
     deductions = filter_payslip_item(deductions)
     # Use the same combine_lines function as fixed payslip
