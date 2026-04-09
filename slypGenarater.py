@@ -86,6 +86,9 @@ def add_custom_entries(earnings, deductions, row, sheet_type):
 
     def safe_fmt(val, width=12):
         try:
+            # Strip commas if val is a pre-formatted string
+            if isinstance(val, str):
+                val = val.replace(',', '')
             fval = float(val)
             return f"{fval:>{width},.2f}"
         except Exception:
@@ -163,11 +166,23 @@ def generate_earnings_from_config(row, sheet_type):
         if pd.isnull(val):
             return False
         try:
+            # Strip commas if val is a string
+            if isinstance(val, str):
+                val = val.replace(',', '')
             float_val = float(val)
             return float_val != 0.0 and not math.isnan(float_val)
         except (ValueError, TypeError):
             return False
-    
+
+    def to_float(val):
+        """Convert value to float, handling strings with commas"""
+        try:
+            if isinstance(val, str):
+                val = val.replace(',', '')
+            return float(val)
+        except (ValueError, TypeError):
+            return 0.0
+
     for display_name, excel_header in mappings['earnings'].items():
         if isinstance(excel_header, list) and len(excel_header) == 2:
             col1, col2 = excel_header
@@ -189,17 +204,17 @@ def generate_earnings_from_config(row, sheet_type):
                         v2 = 0
                 else:
                     v2 = row.get(col2, 0)
-                
+
                 # Only add if at least one value is valid (non-zero)
                 if is_valid_value(v1) or is_valid_value(v2):
-                    earnings.append(f"{display_name:<20}{v1:>12,.2f}{v2:>5,.2f}")
+                    earnings.append(f"{display_name:<20}{to_float(v1):>12,.2f}{to_float(v2):>5,.2f}")
         else:
             # Single column
             if excel_header in row:
                 v = row.get(excel_header, 0)
                 # Only add if value is valid (non-zero)
                 if is_valid_value(v):
-                    earnings.append(f"{display_name:<20}{v:>12,.2f}")
+                    earnings.append(f"{display_name:<20}{to_float(v):>12,.2f}")
     
     return earnings
 
@@ -214,11 +229,23 @@ def generate_deductions_from_config(row, sheet_type):
         if pd.isnull(val):
             return False
         try:
+            # Strip commas if val is a string
+            if isinstance(val, str):
+                val = val.replace(',', '')
             float_val = float(val)
             return float_val != 0.0 and not math.isnan(float_val)
         except (ValueError, TypeError):
             return False
-    
+
+    def to_float(val):
+        """Convert value to float, handling strings with commas"""
+        try:
+            if isinstance(val, str):
+                val = val.replace(',', '')
+            return float(val)
+        except (ValueError, TypeError):
+            return 0.0
+
     for display_name, excel_header in mappings['deductions'].items():
         if isinstance(excel_header, list) and len(excel_header) == 2:
             col1, col2 = excel_header
@@ -240,17 +267,17 @@ def generate_deductions_from_config(row, sheet_type):
                         v2 = 0
                 else:
                     v2 = row.get(col2, 0)
-                
+
                 # Only add if at least one value is valid (non-zero)
                 if is_valid_value(v1) or is_valid_value(v2):
-                    deductions.append(f"{display_name:15}{v1:>12,.2f}{v2:>12,.2f}")
+                    deductions.append(f"{display_name:15}{to_float(v1):>12,.2f}{to_float(v2):>12,.2f}")
         else:
             # Single column
             if excel_header in row:
                 v = row.get(excel_header, 0)
                 # Only add if value is valid (non-zero)
                 if is_valid_value(v):
-                    deductions.append(f"{display_name:15}{v:>12,.2f}")
+                    deductions.append(f"{display_name:15}{to_float(v):>12,.2f}")
     
     return deductions
 
