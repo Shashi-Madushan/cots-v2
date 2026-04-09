@@ -192,7 +192,7 @@ def generate_earnings_from_config(row, sheet_type):
                 
                 # Only add if at least one value is valid (non-zero)
                 if is_valid_value(v1) or is_valid_value(v2):
-                    earnings.append(f"{display_name:<20}{v1:>12,.2f}{v2:>5,.2f}")
+                    earnings.append(f"{display_name:<20} {v1:>7.2f} {v2:>10,.2f}")
         else:
             # Single column
             if excel_header in row:
@@ -243,7 +243,7 @@ def generate_deductions_from_config(row, sheet_type):
                 
                 # Only add if at least one value is valid (non-zero)
                 if is_valid_value(v1) or is_valid_value(v2):
-                    deductions.append(f"{display_name:15}{v1:>12,.2f}{v2:>12,.2f}")
+                    deductions.append(f"{display_name:<20} {v1:>7.2f} {v2:>10,.2f}")
         else:
             # Single column
             if excel_header in row:
